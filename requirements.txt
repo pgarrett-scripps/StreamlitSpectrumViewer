@@ -5,3 +5,4 @@ matplotlib==3.8.2
 numpy==1.26.2
 plotly==5.18.0
 ms_deisotope==0.0.53
+kaleido==0.1.0.post1
