@@ -177,6 +177,7 @@ function CompressUrlLzstring(mzs, intensities) {
 
 
 const [mzArray, intensityArray] = splitPeaks(peaks);
+console.log(mzArray.length);
 const compressedData = CompressUrlLzstring(mzArray, intensityArray);
 const allMods = mergeArrays(mapModsByIndex(mysequence, staticMods), varMods)
 var modifiedSequence = addModifications(mysequence, allMods, ntermMod, ctermMod);
