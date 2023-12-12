@@ -7,15 +7,7 @@ import constants
 import dataclasses
 from typing import Set, Tuple, List
 
-from lzstring import LZString
-
-def decompress_from_encoded_uri_component(compressed_string):
-    decompressed = LZString.decompressFromEncodedURIComponent(compressed_string)
-    return decompressed
-
-def compress_uri_component(string):
-    compressed = LZString.compressToEncodedURIComponent(string)
-    return compressed
+from msms_compression import SpectrumCompressorUrlLzstring
 
 
 @dataclasses.dataclass
@@ -60,11 +52,13 @@ def deserialize_fragments(s) -> set:
 
 
 def serialize_spectra(spectra: List[Tuple[float, float]]) -> str:
-    return ';'.join([f'{s[0]}:{s[1]}' for s in spectra])
+    mzs, ints = zip(*spectra)
+    return SpectrumCompressorUrlLzstring().compress(mzs, ints)
 
 
 def deserialize_spectra(s: str) -> List[Tuple[float, float]]:
-    return [(float(f.split(':')[0]), float(f.split(':')[1])) for f in s.split(';')]
+    mzs, ints = SpectrumCompressorUrlLzstring().decompress(s)
+    return list(zip(mzs, ints))
 
 
 def parse_query_params(params) -> QueryParams:
@@ -133,8 +127,8 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam("Hide unassigned peaks must be a boolean value.")
     query_hide_unassigned_peaks = query_hide_unassigned_peaks == 'True'
 
-    query_spectra = params.get('spectra', [compress_uri_component(serialize_spectra(constants.DEFAULT_SPECTRA))])[0]
-    query_spectra = deserialize_spectra(decompress_from_encoded_uri_component(query_spectra))
+    query_spectra = params.get('spectra', [serialize_spectra(constants.DEFAULT_SPECTRA)])[0]
+    query_spectra = deserialize_spectra(query_spectra)
     for s in query_spectra:
         if s[0] < 0 or s[1] < 0:
             InvalidQueryParam("Spectra must be non-negative numbers.")
@@ -182,7 +176,6 @@ def parse_query_params(params) -> QueryParams:
         for nl in query_custom_losses:
             if nl <= 0:
                 InvalidQueryParam(f"Invalid custom loss: {nl}")
-
 
     # Isotopes validation
     query_isotopes = params.get('isotopes', [str(constants.DEFAULT_ISOTOPES)])[0]
@@ -271,7 +264,7 @@ def generate_app_url(qp: QueryParams) -> str:
         'filter_interrupted_iso': str(qp.filter_interrupted_iso),
         'min_mz': str(qp.min_mz),
         'max_mz': str(qp.max_mz),
-        'spectra': compress_uri_component(serialize_spectra(qp.spectra)),
+        'spectra': serialize_spectra(qp.spectra),
     }
     query_string = '&'.join([f'{key}={value}' for key, value in params.items() if value is not None])
     return f'{base_url}?{query_string}'
