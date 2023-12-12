@@ -54,6 +54,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
         # Create the Spectra Plot
         fig_spectra.add_trace(go.Bar(x=tmp_df['mz'],
                                      y=tmp_df['intensity'],
+                                     width=0.25,
                                      marker_color=tmp_df['color'],
                                      hovertext=hover_texts,
                                      hoverinfo='text',
