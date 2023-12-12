@@ -29,6 +29,7 @@ except InvalidQueryParam as e:
     st.error(str(e))
     st.stop()
 
+
 # Add query option for selected mass_tolerance to st.session_state. This fixes the issue when switching between ppm
 # and th mass tolerance types, and causes the mass tolerance to be too large / too small
 if qp.mass_tolerance_type == 'ppm' and 'ppm_mass_error' not in st.session_state:

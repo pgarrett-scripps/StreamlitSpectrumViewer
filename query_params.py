@@ -34,10 +34,6 @@ class QueryParams:
     min_mz: float
     max_mz: float
 
-    # Add any other fields that you need
-
-    # Add any additional methods or validations as needed
-
 
 class InvalidQueryParam(Exception):
     pass
