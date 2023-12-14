@@ -44,7 +44,7 @@ if qp.mass_tolerance_type == 'th' and 'ppm_mass_error' not in st.session_state:
 with st.sidebar:
     st.title('Spectra Viewer')
 
-    sequence = st.text_input(label='Sequence', value=qp.sequence, help=constants.SEQUENCE_HELP)
+    sequence = st.text_input(label='Sequence', value=qp.sequence, help=constants.SEQUENCE_HELP).replace(' ', '')
     unmodified_sequence = peptacular.sequence.strip_modifications(sequence)
 
     st.write('Ions')
@@ -125,14 +125,8 @@ with st.sidebar:
     with st.expander('Plot Options'):
 
         c1, c2 = st.columns(2)
-        min_intensity = c1.number_input(
-            label='Min Intensity',
-            value=qp.min_intensity,
-            min_value=0.0,
-            max_value=1e9,
-            help=constants.MIN_INTENSITY_HELP
-        )
-        y_axis_scale = c2.radio(
+
+        y_axis_scale = c1.radio(
             label='Y Axis Scale',
             options=['linear', 'log'],
             horizontal=True,
@@ -140,7 +134,7 @@ with st.sidebar:
             help=constants.Y_AXIS_SCALE_HELP
         )
 
-        hide_unassigned_peaks = st.checkbox(
+        hide_unassigned_peaks = c2.checkbox(
             label='Hide Unassigned Peaks',
             value=qp.hide_unassigned_peaks,
             help=constants.HIDE_UNASSIGNED_PEAKS_HELP
@@ -189,27 +183,42 @@ with st.sidebar:
             max_value=1e9,
             help=constants.PEAK_PICKER_MASS_TOLERANCE_HELP)
 
-    c1, c2 = st.columns(2)
-    min_mz = c1.number_input(
-        label='Min m/z',
-        value=qp.min_mz,
-        min_value=0.0,
-        max_value=1e9,
-        help=constants.MIN_MZ_HELP
-    )
-    max_mz = c2.number_input(
-        label='Max m/z',
-        value=qp.max_mz,
-        min_value=0.0,
-        max_value=1e9,
-        help=constants.MAX_MZ_HELP
-    )
+    with st.expander('Spectra'):
+        c1, c2 = st.columns(2)
+        min_mz = c1.number_input(
+            label='Min m/z',
+            value=qp.min_mz,
+            min_value=0.0,
+            max_value=1e9,
+            help=constants.MIN_MZ_HELP
+        )
+        max_mz = c2.number_input(
+            label='Max m/z',
+            value=qp.max_mz,
+            min_value=0.0,
+            max_value=1e9,
+            help=constants.MAX_MZ_HELP
+        )
 
-    spectra = st.text_area(
-        label='Spectra',
-        value='\n'.join(f'{s[0]} {s[1]}' for s in qp.spectra),
-        help=constants.SPECTRA_HELP
-    )
+        min_intensity = st.number_input(
+            label='Min Intensity',
+            value=qp.min_intensity,
+            min_value=0.0,
+            max_value=1e9,
+            help=constants.MIN_INTENSITY_HELP
+        )
+
+        spectra = st.text_area(
+            label='Spectra',
+            value='\n'.join(f'{s[0]} {s[1]}' for s in qp.spectra),
+            help=constants.SPECTRA_HELP
+        )
+
+    with st.expander('AA Masses'):
+        aa_masses = eval(st.text_area(
+            label='AA Masses',
+            value=str(qp.aa_masses),
+        ))
 
     if spectra:
         mzs, ints = [], []
@@ -254,7 +263,8 @@ qp = QueryParams(
     filter_missing_mono=filter_missing_mono,
     filter_interrupted_iso=filter_interrupted_iso,
     min_mz=min_mz,
-    max_mz=max_mz
+    max_mz=max_mz,
+    aa_masses=aa_masses,
 )
 
 if mass_tolerance_type == 'th' and mass_tolerance > 1:
@@ -276,13 +286,12 @@ url = generate_app_url(qp)
 st.write(f'##### [Analysis URL]({url}) (copy me and send to your friends!)')
 
 # Show Sequence Info
-sequence_charge = 2
 st.header(sequence)
-c1, c2, c3, c4 = st.columns(4)
-c1.metric('Mass', round(calculate_mass(sequence), 4))
-c2.metric('m/z', round(calculate_mz(sequence, sequence_charge), 4))
-c3.metric('Charge', sequence_charge)
-c4.metric('Length', len(unmodified_sequence))
+c1, c2, c3 = st.columns(3)
+
+c1.metric('Mass', round(calculate_mass(sequence, aa_masses=aa_masses), 4))
+c2.metric('Length', len(unmodified_sequence))
+c3.metric('Peaks', len(spectra))
 
 fragments = []
 for ion, charge in zip(ion_types, charges):
@@ -292,7 +301,8 @@ for ion, charge in zip(ion_types, charges):
                                      monoisotopic=(mass_type == 'monoisotopic'),
                                      internal=internal_fragments,
                                      isotopes=list(range(isotopes + 1)),
-                                     losses=losses))
+                                     losses=losses,
+                                     aa_masses=aa_masses))
 
 frag_df = pd.DataFrame([fragment.to_dict() for fragment in fragments])
 
@@ -501,7 +511,6 @@ if spectra:
                        data=data,
                        file_name="spectra.svg",
                        mime="image/svg+xml")
-
 
 
     dfs = []

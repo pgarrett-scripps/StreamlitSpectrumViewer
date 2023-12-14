@@ -1,11 +1,12 @@
 import urllib
 
+import peptacular.constants
 from peptacular.mass import valid_mass_sequence
 
 import constants
 
 import dataclasses
-from typing import Set, Tuple, List
+from typing import Set, Tuple, List, Dict
 
 from msms_compression import SpectrumCompressorUrlLzstring
 
@@ -33,6 +34,7 @@ class QueryParams:
     filter_interrupted_iso: bool
     min_mz: float
     max_mz: float
+    aa_masses: Dict[str, float]
 
 
 class InvalidQueryParam(Exception):
@@ -212,6 +214,24 @@ def parse_query_params(params) -> QueryParams:
     except ValueError:
         InvalidQueryParam("Maximum m/z must be a number.")
 
+    default_aa_masses = peptacular.constants.AVERAGE_AA_MASSES if query_mass_type == 'average' else peptacular.constants.MONO_ISOTOPIC_AA_MASSES
+    default_aa_masses = str(default_aa_masses).replace(" ", '')
+    query_aa_masses = params.get('aa_masses', [str(default_aa_masses)])[0]
+    try:
+        query_aa_masses = eval(query_aa_masses)
+        if not isinstance(query_aa_masses, dict):
+            raise ValueError
+    except ValueError:
+        InvalidQueryParam("Masses must be a dictionary of amino acid masses.")
+    for aa, mass in query_aa_masses.items():
+        try:
+            mass = float(mass)
+            if mass <= 0:
+                raise ValueError
+            query_aa_masses[aa] = mass
+        except ValueError:
+            InvalidQueryParam(f"Invalid mass for amino acid {aa}: {mass}")
+
     return QueryParams(
         sequence=query_peptide_sequence,
         mass_type=query_mass_type,
@@ -233,7 +253,8 @@ def parse_query_params(params) -> QueryParams:
         filter_missing_mono=query_filter_missing_mono,
         filter_interrupted_iso=query_filter_interrupted_iso,
         min_mz=query_min_mz,
-        max_mz=query_max_mz
+        max_mz=query_max_mz,
+        aa_masses=query_aa_masses,
     )
 
 
@@ -260,6 +281,7 @@ def generate_app_url(qp: QueryParams) -> str:
         'filter_interrupted_iso': str(qp.filter_interrupted_iso),
         'min_mz': str(qp.min_mz),
         'max_mz': str(qp.max_mz),
+        'aa_masses': str(qp.aa_masses).replace(" ", ''),
         'spectra': serialize_spectra(qp.spectra),
     }
     query_string = '&'.join([f'{key}={value}' for key, value in params.items() if value is not None])
