@@ -1,6 +1,3 @@
-# TODO: move plotly to separate file
-# TODO: push git / streamlit
-# TODO: Update and distribute user script
 # TODO: Add loss analysis plot
 
 import tempfile
@@ -16,8 +13,9 @@ import matplotlib as mpl
 import ms_deisotope
 
 import constants
+from color_util import get_color_dict
 from plot_util import generate_annonated_spectra_plotly, coverage_string, generate_fragment_plot, \
-    generate_fragment_plot_ion_type
+    generate_fragment_plot_ion_type, generate_error_histogram
 from query_params import parse_query_params, InvalidQueryParam, generate_app_url, QueryParams
 
 st.set_page_config(page_title="Spectra Viewer", page_icon=":glasses:", layout="wide")
@@ -28,6 +26,33 @@ try:
 except InvalidQueryParam as e:
     st.error(str(e))
     st.stop()
+
+# Initialize session state for fragment types if it doesn't exist (page refresh)
+if 'fragment_types' not in st.session_state:
+    st.balloons()
+    st.session_state.fragment_types = set()
+    st.session_state.fragment_types.update(qp.fragment_types)
+
+
+def update_fragment_types(label, is_checked):
+    if is_checked:
+        st.session_state.fragment_types.add(label)
+    elif label in st.session_state.fragment_types:
+        st.session_state.fragment_types.remove(label)
+
+
+def get_ion_label_superscript(i: str, c: int) -> str:
+    return i + to_superscript(f'+{c}')
+
+
+# Function to convert charge to a superscript representation
+def to_superscript(s):
+    superscript_map = {
+        "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵",
+        "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "0": "⁰",
+        '+': '⁺'
+    }
+    return ''.join(superscript_map.get(c, '') for c in str(s))
 
 
 # Add query option for selected mass_tolerance to st.session_state. This fixes the issue when switching between ppm
@@ -41,22 +66,50 @@ if qp.mass_tolerance_type == 'th' and 'th_mass_error' not in st.session_state:
 if qp.mass_tolerance_type == 'th' and 'ppm_mass_error' not in st.session_state:
     st.session_state['ppm_mass_error'] = 30.0
 
+def get_ion_label(i: str, c: int) -> str:
+    return '+' * c + i
+
+
+
 with st.sidebar:
     st.title('Spectra Viewer')
 
     sequence = st.text_input(label='Sequence', value=qp.sequence, help=constants.SEQUENCE_HELP).replace(' ', '')
     unmodified_sequence = peptacular.sequence.strip_modifications(sequence)
 
+    c1, c2 = st.columns(2)
+    min_charge = c1.number_input(label='Min Charge',
+                                 value=qp.min_charge,
+                                 min_value=constants.MIN_CHARGE,
+                                 max_value=constants.MAX_CHARGE)
+    max_charge = c2.number_input(label='Max Charge',
+                                 value=qp.max_charge,
+                                 min_value=constants.MIN_CHARGE,
+                                 max_value=constants.MAX_CHARGE)
+
+    color_dict = get_color_dict(min_charge, max_charge)
+
+    c1, c2 = st.columns(2)
+    deselected_all = c1.button(label='Deselect All')
+    select_all = c2.button(label='Select All')
+
     st.write('Ions')
     fragment_types = set()
-    for ion in constants.IONS:
-        cols = st.columns(constants.MAX_CHARGE)
-        for i, col in enumerate(cols, 1):
-            label = '+' * i + ion
-            if col.checkbox(label,
-                            value=label in qp.fragment_types,
-                            key=label):
+    for i in constants.IONS:
+        cols = st.columns(max_charge - min_charge + 1)
+        for c, col in enumerate(cols, min_charge):
+            label = get_ion_label(i, c)
+            val = label in st.session_state.fragment_types
+            if deselected_all:
+                val = False
+            if select_all:
+                val = True
+            ion_selected = col.checkbox(label=get_ion_label_superscript(i, c),
+                                        value=val,
+                                        key=label)
+            if ion_selected:
                 fragment_types.add(label)
+            update_fragment_types(label, ion_selected)
 
     internal_fragments = st.checkbox(
         label='Internal Fragments',
@@ -200,7 +253,14 @@ with st.sidebar:
             help=constants.MAX_MZ_HELP
         )
 
-        min_intensity = st.number_input(
+        c1, c2 = st.columns(2)
+        min_intensity_type = c1.selectbox(
+            label='Min Intensity Type',
+            options=constants.VALID_MIN_INTENSITY_TYPES,
+            index=constants.VALID_MIN_INTENSITY_TYPES.index(qp.min_intensity_type),
+        )
+
+        min_intensity = c2.number_input(
             label='Min Intensity',
             value=qp.min_intensity,
             min_value=0.0,
@@ -214,35 +274,52 @@ with st.sidebar:
             help=constants.SPECTRA_HELP
         )
 
+        compression_algorithm = st.selectbox(
+            label='Compression Algorithm',
+            options=constants.VALID_COMPRESSION_ALGORITHMS,
+            index=constants.VALID_COMPRESSION_ALGORITHMS.index('brotli'),
+        )
+
     with st.expander('AA Masses'):
         aa_masses = eval(st.text_area(
             label='AA Masses',
             value=str(qp.aa_masses),
         ))
 
+    debug = st.checkbox(
+        label='Debug',
+        value=False
+    )
+
     if spectra:
         mzs, ints = [], []
-
         for line in spectra.split('\n'):
             mz, intensity = line.split(' ')
+            mzs.append(float(mz))
+            ints.append(float(intensity))
 
-            mz = float(mz)
-            intensity = float(intensity)
+        int_threshold = min_intensity
+        if min_intensity_type == 'relative':
+            int_threshold = max(ints) * (min_intensity / 100)
 
-            if intensity <= min_intensity:
+        filtered_mzs, filtered_ints = [], []
+        for mz, intensity in zip(mzs, ints):
+
+            if intensity <= int_threshold:
                 continue
 
             if mz < min_mz or mz > max_mz:
                 continue
 
-            mzs.append(mz)
-            ints.append(intensity)
+            filtered_mzs.append(mz)
+            filtered_ints.append(intensity)
 
-        spectra = list(zip(mzs, ints))
+        spectra = list(zip(filtered_mzs, filtered_ints))
     else:
         spectra = []
 
-qp = QueryParams(
+
+qp_new = QueryParams(
     sequence=sequence,
     mass_type=mass_type,
     fragment_types=fragment_types,
@@ -257,14 +334,18 @@ qp = QueryParams(
     peak_picker=peak_picker,
     peak_picker_min_intensity=peak_picker_min_intensity,
     peak_picker_mass_tolerance=peak_picker_mass_tolerance,
-    neutral_losses=set(neutral_losses),
-    custom_losses=set(custom_losses),
+    neutral_losses=neutral_losses,
+    custom_losses=custom_losses,
     isotopes=isotopes,
     filter_missing_mono=filter_missing_mono,
     filter_interrupted_iso=filter_interrupted_iso,
     min_mz=min_mz,
     max_mz=max_mz,
     aa_masses=aa_masses,
+    compression_algorithm=compression_algorithm,
+    min_intensity_type=min_intensity_type,
+    min_charge=min_charge,
+    max_charge=max_charge
 )
 
 if mass_tolerance_type == 'th' and mass_tolerance > 1:
@@ -274,16 +355,18 @@ if mass_tolerance_type == 'th' and mass_tolerance > 1:
 # retrieve ion selections
 ion_types = []
 charges = []
-for ion in constants.IONS:
-    for i in range(1, constants.MAX_CHARGE + 1):
-        label = '+' * i + ion
+for i in constants.IONS:
+    for c in range(min_charge, max_charge + 1):
+        label = get_ion_label(i, c)
         if st.session_state.get(label, False):
-            ion_types.append(ion)
-            charges.append(i)
+            ion_types.append(i)
+            charges.append(c)
 
 # Show Analysis URL
-url = generate_app_url(qp)
+url = generate_app_url(qp_new, qp.compression_algorithm, debug=debug)
+url_chars = len(url)
 st.write(f'##### [Analysis URL]({url}) (copy me and send to your friends!)')
+st.write(f'Url Length: {url_chars} characters, {round(url_chars / 1024, 2)} KB')
 
 # Show Sequence Info
 st.header(sequence)
@@ -314,8 +397,8 @@ if spectra:
         peaks = [(mz, intensity) for mz, intensity in zip(mzs, ints)]
         deconvoluted_peaks, _ = ms_deisotope.deconvolute_peaks(peaks, averagine=ms_deisotope.peptide,
                                                                scorer=ms_deisotope.MSDeconVFitter(
-                                                                   qp.peak_picker_min_intensity,
-                                                                   qp.peak_picker_mass_tolerance))
+                                                                   peak_picker_min_intensity,
+                                                                   peak_picker_mass_tolerance))
         mzs = [float(peak.mz) for peak in deconvoluted_peaks]
         ints = [float(peak.intensity) for peak in deconvoluted_peaks]
 
@@ -445,16 +528,16 @@ if spectra:
     def create_labels(row):
         if row['ion_type'] != '':
             charge_str = '+' * int(row['charge'])
+            charge = int(row['charge'])
             ion_type_str = row['ion_type']
-            parent_number_str = str(int(row['parent_number']))
-            internal_str = 'i' if row['internal'] else ''
 
             if row['internal']:
-                color_label = f"{charge_str}{internal_str}"
+                color_label = get_ion_label(row['ion_type'], int(row['charge']))
+                ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}i"
             else:
-                color_label = f"{charge_str}{ion_type_str}"
+                color_label = get_ion_label(row['ion_type'], int(row['charge']))
+                ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}"
 
-            ion_label = f"{charge_str}{ion_type_str}{parent_number_str}{internal_str}"
         else:
             color_label = 'unassigned'
             ion_label = 'unassigned'
@@ -467,10 +550,10 @@ if spectra:
     spectra_df['ion_label'], spectra_df['color_label'] = zip(*labels)
 
     # Assigning colors based on color labels
-    spectra_df['color'] = [constants.COLOR_DICT[label] for label in spectra_df['color_label']]
+    spectra_df['color'] = [color_dict[label] for label in spectra_df['color_label']]
 
     # change internal ions color to magenta
-    #spectra_df.loc[spectra_df['internal'], 'color'] = 'magenta'
+    # spectra_df.loc[spectra_df['internal'], 'color'] = 'magenta'
 
     cmap = mpl.colormaps.get_cmap('Blues')
 
@@ -488,7 +571,7 @@ if spectra:
                 cov_arr[len(unmodified_sequence) - (num - 1) - 1] = 1
 
         if len(cov_arr) > 0:
-            c = constants.COLOR_DICT['+' * charge + ion]
+            c = color_dict[get_ion_label(ion, charge)]
             s = coverage_string(cov_arr, unmodified_sequence, c)
 
             # center text
@@ -512,14 +595,14 @@ if spectra:
                        file_name="spectra.svg",
                        mime="image/svg+xml")
 
-
     dfs = []
     combined_data = {'AA': list(unmodified_sequence)}
     for ion, charge in zip(ion_types, charges):
         data = {'AA': list(unmodified_sequence)}
-        ion_df = frag_df[
-            (frag_df['ion_type'] == ion) & (frag_df['charge'] == charge) &
-            (frag_df['internal'] == False)]
+        ion_df = frag_df.copy()
+        ion_df = ion_df[
+            (ion_df['ion_type'] == ion) & (ion_df['charge'] == charge) &
+            (ion_df['internal'] == False)]
         ion_df.sort_values(by=['number'], inplace=True)
 
         # keep only a single number
@@ -532,7 +615,7 @@ if spectra:
 
         data[ion] = frags
 
-        combined_data['+' * charge + ion] = frags
+        combined_data[get_ion_label(ion, charge)] = frags
 
         # Displaying the table
         df = pd.DataFrame(data)
@@ -553,7 +636,7 @@ if spectra:
 
     def color_by_ion_type(col):
         ion_type = col.name[-1]
-        color = constants.COLOR_DICT.get(ion_type, 'grey')  # get color or default to grey if not found
+        color = color_dict.get(ion_type, 'grey')  # get color or default to grey if not found
         return ['color: %s' % color] * len(col)
 
 
@@ -588,14 +671,20 @@ if spectra:
                 else:
                     ion_number = len(unmodified_sequence) - row
                 label = col + str(ion_number)
-                if label in accepted_normal_ions:
+                mz = data.loc[row, col]
+
+                if mz <= min_mz or mz >= max_mz:
                     styled.loc[
-                        row, col] = f'background-color: {constants.COLOR_DICT[col]}; color: white; text-align: center; font-weight: bold;'
-                elif label in accepted_internal_ions:
-                    styled.loc[
-                        row, col] = f'background-color: {constants.COLOR_DICT[col]}; color: magenta; text-align: center; font-style: italic; font-weight: bold;'
+                        row, col] = f'background-color: #BEBEBE; color: black; text-align: center; font-weight: bold;'
                 else:
-                    styled.loc[row, col] = f'background-color: white; color: black; text-align: center;'
+                    if label in accepted_normal_ions:
+                        styled.loc[
+                            row, col] = f'background-color: {color_dict[col]}; color: white; text-align: center; font-weight: bold;'
+                    elif label in accepted_internal_ions:
+                        styled.loc[
+                            row, col] = f'background-color: {color_dict[col]}; color: magenta; text-align: center; font-style: italic; font-weight: bold;'
+                    else:
+                        styled.loc[row, col] = f'background-color: white; color: black; text-align: center;'
 
         return styled
 
@@ -666,8 +755,15 @@ if spectra:
         for peak in isotopic_pattern:
             iso_data.append([i, peak.mz, peak.intensity])
 
-with st.expander('Fragments'):
-    st.dataframe(frag_df)
 
-with st.expander('Peaks'):
-    st.dataframe(spectra_df)
+    #error_fig = generate_error_histogram(spectra_df, mass_tolerance_type)
+    #st.plotly_chart(error_fig, use_container_width=True)
+
+    with st.expander('Fragments'):
+        st.dataframe(frag_df)
+
+    with st.expander('Peaks'):
+        st.dataframe(spectra_df)
+
+else:
+    st.warning('No spectra....')

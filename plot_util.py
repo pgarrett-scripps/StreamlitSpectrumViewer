@@ -31,9 +31,9 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
         if x == 'unassigned':
             return 0
         elif x.endswith('i'):
-            return (ord('z')+1) * 3 + x.count('+')
+            return (ord('z')+1) * 50 + x.count('+')
         else:
-            return ord(x[-1]) * 3 + x.count('+')
+            return ord(x[-1]) * 50 + x.count('+')
 
     # Move 'unassigned' (or your specific label) to the front
     if 'unassigned' in unique_color_labels:
@@ -243,6 +243,33 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
     fig.update_yaxes(row=1, col=1, range=[min_error - abs(min_error * 0.3), max_error + abs(max_error * 0.3)])
 
     return fig
+
+
+def generate_error_histogram(df, error_scale='ppm'):
+    # Select the error column based on the error scale
+    error_column = 'error' if error_scale == 'th' else 'error_ppm'
+
+    df = df[df['color_label'] != 'unassigned']
+
+    # Create the histogram
+    fig_histogram = go.Figure()
+    fig_histogram.add_trace(
+        go.Histogram(
+            x=df[error_column],
+            nbinsx=20,
+            marker_color='blue',  # You can choose a different color
+        )
+    )
+
+    # Update the layout
+    fig_histogram.update_layout(
+        title='Fragment Ion Error Histogram',
+        xaxis_title=f'Error ({error_scale})',
+        yaxis_title='Count',
+        bargap=0.1,  # Gap between bars
+    )
+
+    return fig_histogram
 
 
 def generate_fragment_plot(unmodified_sequence, spectra_df, internal=False):
