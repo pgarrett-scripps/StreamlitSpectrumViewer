@@ -53,9 +53,9 @@ def get_color_for_state(ion, charge, min_charge, max_charge, format_type='hex'):
         'a': lambda x: (1-get_pos(x))*0.27,
         'b': lambda x: (1-get_pos(x))*0.55,
         'c': lambda x: 0.75 + (get_pos(x))*0.25,
-        'x': lambda x: (1-get_pos(x))*0.33,
-        'y': lambda x: 0.7 + (get_pos(x))*0.3,
-        'z': lambda x: (1-get_pos(x))*0.27,
+        'x': lambda x: (1-get_pos(x))*0.2 + 0.1,
+        'y': lambda x: 0.7 + (get_pos(x))*0.2,
+        'z': lambda x: (1-get_pos(x))*0.3,
     }
 
     # Get the colormap for the category

@@ -54,6 +54,14 @@ def to_superscript(s):
     }
     return ''.join(superscript_map.get(c, '') for c in str(s))
 
+def to_subscript(s):
+    subscript_map = {
+        "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅",
+        "6": "₆", "7": "₇", "8": "₈", "9": "₉", "0": "₀",
+        '+': '₊', '-': '₋'
+    }
+    return ''.join(subscript_map.get(c, '') for c in str(s))
+
 
 # Add query option for selected mass_tolerance to st.session_state. This fixes the issue when switching between ppm
 # and th mass tolerance types, and causes the mass tolerance to be too large / too small
@@ -277,7 +285,7 @@ with st.sidebar:
         compression_algorithm = st.selectbox(
             label='Compression Algorithm',
             options=constants.VALID_COMPRESSION_ALGORITHMS,
-            index=constants.VALID_COMPRESSION_ALGORITHMS.index('brotli'),
+            index=constants.VALID_COMPRESSION_ALGORITHMS.index(qp.compression_algorithm),
         )
 
     with st.expander('AA Masses'):
@@ -739,22 +747,6 @@ if spectra:
         st.plotly_chart(generate_fragment_plot(unmodified_sequence, spectra_df, True), use_container_width=True)
 
     st.markdown('---')
-
-    st.subheader('Isotopes')
-
-    iso_data = []
-    for i, row in spectra_df.iterrows():
-        mz = row['mz']
-        intensity = row['intensity']
-        charge = row['charge']
-
-        if charge == 0:
-            continue
-
-        isotopic_pattern = ms_deisotope.peptide.isotopic_cluster(mz, charge)
-        for peak in isotopic_pattern:
-            iso_data.append([i, peak.mz, peak.intensity])
-
 
     #error_fig = generate_error_histogram(spectra_df, mass_tolerance_type)
     #st.plotly_chart(error_fig, use_container_width=True)
