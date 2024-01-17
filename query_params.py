@@ -1,7 +1,7 @@
 import urllib
 
 import peptacular.constants
-from msms_compression.compressors import SpectrumCompressorUrlLossy
+from msms_compression.compressors import SpectrumCompressorStringUrl2Lossy, SpectrumCompressorUrl2
 from peptacular.mass import valid_mass_sequence
 
 import constants
@@ -66,7 +66,7 @@ def serialize_spectra(spectra: List[Tuple[float, float]], compression_algorithm:
     elif compression_algorithm == 'brotli':
         return SpectrumCompressorUrl().compress(mzs, ints)
     elif compression_algorithm == 'lossy':
-        return SpectrumCompressorUrlLossy().compress(mzs, ints)
+        return SpectrumCompressorUrl2().compress(mzs, ints)
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')
 
@@ -79,7 +79,7 @@ def deserialize_spectra(s: str, compression_algorithm: str) -> List[Tuple[float,
         mzs, ints = SpectrumCompressorUrl().decompress(s)
         return list(zip(mzs, ints))
     elif compression_algorithm == 'lossy':
-        mzs, ints = SpectrumCompressorUrlLossy().decompress(s)
+        mzs, ints = SpectrumCompressorUrl2().decompress(s)
         return list(zip(mzs, ints))
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')

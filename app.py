@@ -54,6 +54,7 @@ def to_superscript(s):
     }
     return ''.join(superscript_map.get(c, '') for c in str(s))
 
+
 def to_subscript(s):
     subscript_map = {
         "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅",
@@ -62,6 +63,34 @@ def to_subscript(s):
     }
     return ''.join(subscript_map.get(c, '') for c in str(s))
 
+
+def generate_fragmentation_latex(peptide, forward_indices, reverse_indices):
+    """
+    Generates a LaTeX string for visualizing peptide fragmentation sites.
+
+    :param peptide: The peptide sequence.
+    :param forward_indices: A list of indices for forward fragment ion sites.
+    :param reverse_indices: A list of indices for reverse fragment ion sites.
+    :return: A LaTeX string representing the peptide with fragmentation sites.
+    """
+    # Initialize an empty list to store each part of the LaTeX string
+    latex_parts = []
+
+    # Process each amino acid in the peptide
+    for i, aa in enumerate(peptide):
+        # Add the amino acid to the LaTeX parts
+        latex_parts.append(aa)
+
+        # Check if this position is a forward fragmentation site
+        if i in forward_indices:
+            latex_parts.append(r"_{\rfloor}")
+        # Check if this position is a reverse fragmentation site
+        # Note: Reverse indices count from the end of the peptide
+        if (len(peptide) - 1 - i) in reverse_indices:
+            latex_parts.append(r"^{\lceil}")
+
+    # Join all parts into a single string and return
+    return ''.join(latex_parts)
 
 # Add query option for selected mass_tolerance to st.session_state. This fixes the issue when switching between ppm
 # and th mass tolerance types, and causes the mass tolerance to be too large / too small
@@ -74,15 +103,17 @@ if qp.mass_tolerance_type == 'th' and 'th_mass_error' not in st.session_state:
 if qp.mass_tolerance_type == 'th' and 'ppm_mass_error' not in st.session_state:
     st.session_state['ppm_mass_error'] = 30.0
 
+
 def get_ion_label(i: str, c: int) -> str:
     return '+' * c + i
-
 
 
 with st.sidebar:
     st.title('Spectra Viewer')
 
-    sequence = st.text_input(label='Sequence', value=qp.sequence, help=constants.SEQUENCE_HELP).replace(' ', '')
+    sequence = st.text_input(label='Sequence',
+                             value=qp.sequence,
+                             help=constants.SEQUENCE_HELP).replace(' ', '')
     unmodified_sequence = peptacular.sequence.strip_modifications(sequence)
 
     c1, c2 = st.columns(2)
@@ -90,6 +121,7 @@ with st.sidebar:
                                  value=qp.min_charge,
                                  min_value=constants.MIN_CHARGE,
                                  max_value=constants.MAX_CHARGE)
+
     max_charge = c2.number_input(label='Max Charge',
                                  value=qp.max_charge,
                                  min_value=constants.MIN_CHARGE,
@@ -326,7 +358,6 @@ with st.sidebar:
     else:
         spectra = []
 
-
 qp_new = QueryParams(
     sequence=sequence,
     mass_type=mass_type,
@@ -384,18 +415,34 @@ c1.metric('Mass', round(calculate_mass(sequence, aa_masses=aa_masses), 4))
 c2.metric('Length', len(unmodified_sequence))
 c3.metric('Peaks', len(spectra))
 
+
+cols = st.columns(max_charge - min_charge + 1)
+for i in range(min_charge, max_charge + 1):
+    col = cols[i - min_charge]
+    col.metric(f'M/Z +{i}', round(calculate_mz(sequence, charge=i, aa_masses=aa_masses), 4))
+
+
+@st.cache_data
+def build_fragments_cached(*args, **kwargs):
+    return build_fragments(*args, **kwargs)
+
+
+
 fragments = []
 for ion, charge in zip(ion_types, charges):
-    fragments.extend(build_fragments(sequence=sequence,
-                                     ion_types=ion,
-                                     charges=charge,
-                                     monoisotopic=(mass_type == 'monoisotopic'),
-                                     internal=internal_fragments,
-                                     isotopes=list(range(isotopes + 1)),
-                                     losses=losses,
-                                     aa_masses=aa_masses))
+    fragments.extend(build_fragments_cached(sequence=sequence,
+                                            ion_types=ion,
+                                            charges=charge,
+                                            monoisotopic=(mass_type == 'monoisotopic'),
+                                            internal=internal_fragments,
+                                            isotopes=list(range(isotopes + 1)),
+                                            losses=losses,
+                                            aa_masses=aa_masses))
 
 frag_df = pd.DataFrame([fragment.to_dict() for fragment in fragments])
+
+
+#frag_df, fragments = get_fragments(ion_types, charges, sequence, mass_type, internal_fragments, isotopes, losses, aa_masses)
 
 if spectra:
 
@@ -748,14 +795,15 @@ if spectra:
 
     st.markdown('---')
 
-    #error_fig = generate_error_histogram(spectra_df, mass_tolerance_type)
-    #st.plotly_chart(error_fig, use_container_width=True)
+    # error_fig = generate_error_histogram(spectra_df, mass_tolerance_type)
+    # st.plotly_chart(error_fig, use_container_width=True)
 
     with st.expander('Fragments'):
         st.dataframe(frag_df)
 
     with st.expander('Peaks'):
         st.dataframe(spectra_df)
+
 
 else:
     st.warning('No spectra....')
