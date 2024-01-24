@@ -1,3 +1,18 @@
+import os
+
+
+def get_env_int(var_name, default):
+    return int(os.getenv(var_name, default))
+
+
+def get_env_float(var_name, default):
+    return float(os.getenv(var_name, default))
+
+
+def get_env_str(var_name, default):
+    return os.getenv(var_name, default)
+
+
 VALID_MASS_TYPES = {'monoisotopic', 'average'}
 DEFAULT_MASS_TYPE = 'monoisotopic'
 
@@ -34,8 +49,8 @@ COLOR_DICT = {'+i': 'mediumvioletred', '++i': 'palevioletred', '+++i': 'hotpink'
 VALID_MASS_TOLERANCE_TYPES = {'ppm', 'Da'}
 VALID_PEAK_ASSIGNMENTS = {'largest', 'closest'}  # Add more valid options as needed
 VALID_Y_AXIS_SCALES = {'linear', 'log'}  # Add more valid scales as needed
-MIN_CHARGE = 1
-MAX_CHARGE = 5
+MIN_CHARGE = get_env_int('MIN_CHARGE', 1)
+MAX_CHARGE = get_env_int('MAX_CHARGE', 5)
 NEUTRAL_LOSSES = {'H2O': -18.0106, 'NH3': -17.0265, 'H3PO4': -97.9769}
 DEFAULT_COMPRESSION_ALGORITHM = 'brotli'
 VALID_COMPRESSION_ALGORITHMS = ['lzstring', 'brotli', 'lossy']
@@ -46,7 +61,7 @@ DEFAULT_MIN_INTENSITY_TYPE = 'absolute'
 DEFAULT_MIN_CHARGE = 1
 DEFAULT_MAX_CHARGE = 3
 IONS = 'abcxyz'
-BASE_URL = 'https://spectrum-viewer.streamlit.app/'
+BASE_URL = get_env_str('BASE_URL', 'https://spectrum-viewer.streamlit.app/')
 
 DEFAULT_SPECTRA = [(283.751526, 6.493506), (287.601379, 11.096813), (295.031097, 2.801403), (305.472137, 2.626226),
                    (307.404083, 3.930447), (308.360321, 9.893921), (310.225128, 3.961838), (311.703918, 3.872004),

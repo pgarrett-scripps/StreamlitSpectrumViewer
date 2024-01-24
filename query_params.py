@@ -1,7 +1,6 @@
 import urllib
 
 import peptacular.constants
-from msms_compression.compressors import SpectrumCompressorStringUrl2Lossy, SpectrumCompressorUrl2
 from peptacular.mass import valid_mass_sequence
 
 import constants
@@ -9,8 +8,10 @@ import constants
 import dataclasses
 from typing import Set, Tuple, List, Dict
 
-from msms_compression import SpectrumCompressorUrlLzstring, SpectrumCompressorUrl
+from msms_compression import SpectrumCompressorF32LzstringUri, SpectrumCompressorUrl
 
+from msms_compression import BaseCompressor, url_encoder, SpectrumCompressorI32, brotli_compressor
+lossy_compressor = BaseCompressor(SpectrumCompressorI32(2, 1), brotli_compressor, url_encoder)
 
 @dataclasses.dataclass
 class QueryParams:
@@ -62,24 +63,24 @@ def serialize_spectra(spectra: List[Tuple[float, float]], compression_algorithm:
         mzs, ints = zip(*spectra)
 
     if compression_algorithm == 'lzstring':
-        return SpectrumCompressorUrlLzstring().compress(mzs, ints)
+        return SpectrumCompressorF32LzstringUri.compress(mzs, ints)
     elif compression_algorithm == 'brotli':
-        return SpectrumCompressorUrl().compress(mzs, ints)
+        return SpectrumCompressorUrl.compress(mzs, ints)
     elif compression_algorithm == 'lossy':
-        return SpectrumCompressorUrl2().compress(mzs, ints)
+        return lossy_compressor.compress(mzs, ints)
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')
 
 
 def deserialize_spectra(s: str, compression_algorithm: str) -> List[Tuple[float, float]]:
     if compression_algorithm == 'lzstring':
-        mzs, ints = SpectrumCompressorUrlLzstring().decompress(s)
+        mzs, ints = SpectrumCompressorF32LzstringUri.decompress(s)
         return list(zip(mzs, ints))
     elif compression_algorithm == 'brotli':
-        mzs, ints = SpectrumCompressorUrl().decompress(s)
+        mzs, ints = SpectrumCompressorUrl.decompress(s)
         return list(zip(mzs, ints))
     elif compression_algorithm == 'lossy':
-        mzs, ints = SpectrumCompressorUrl2().decompress(s)
+        mzs, ints = lossy_compressor.decompress(s)
         return list(zip(mzs, ints))
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')
@@ -103,17 +104,17 @@ def deserialize_aa_masses(s: str) -> Dict[str, float]:
 
 def parse_query_params(params) -> QueryParams:
     # Validate Peptide Sequence
-    query_peptide_sequence = params.get('sequence', [constants.DEFAULT_SEQUENCE])[0]
+    query_peptide_sequence = params.get('sequence', constants.DEFAULT_SEQUENCE)
     if valid_mass_sequence(query_peptide_sequence) is False:
         raise InvalidQueryParam("Invalid peptide sequence.")
 
     # Mass Type Validation
-    query_mass_type = params.get('mass_type', [constants.DEFAULT_MASS_TYPE])[0]
+    query_mass_type = params.get('mass_type', constants.DEFAULT_MASS_TYPE)
     if query_mass_type not in constants.VALID_MASS_TYPES:
         raise InvalidQueryParam("Invalid mass type.")
 
     # Fragment Types Validation
-    query_fragment_types = params.get('fragment_types', [serialize_fragments(constants.DEFAULT_FRAGMENT_TYPES)])[0]
+    query_fragment_types = params.get('fragment_types', serialize_fragments(constants.DEFAULT_FRAGMENT_TYPES))
     try:
         query_fragment_types = deserialize_fragments(query_fragment_types)
     except ValueError:
@@ -122,12 +123,12 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam(f"Invalid fragment types: {query_fragment_types}")
 
     # Mass Tolerance Type Validation
-    query_mass_tolerance_type = params.get('mass_tolerance_type', [constants.DEFAULT_MASS_TOLERANCE_TYPE])[0]
+    query_mass_tolerance_type = params.get('mass_tolerance_type', constants.DEFAULT_MASS_TOLERANCE_TYPE)
     if query_mass_tolerance_type not in constants.VALID_MASS_TOLERANCE_TYPES:
         InvalidQueryParam("Invalid mass tolerance type.")
 
     # Mass Tolerance Validation
-    query_mass_tolerance = params.get('mass_tolerance', [str(constants.DEFAULT_MASS_TOLERANCE)])[0]
+    query_mass_tolerance = params.get('mass_tolerance', str(constants.DEFAULT_MASS_TOLERANCE))
     try:
         query_mass_tolerance = float(query_mass_tolerance)
         if query_mass_tolerance <= 0:
@@ -136,18 +137,18 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam("Mass tolerance must be a number.")
 
     # Peak Assignment Validation
-    query_peak_assignment = params.get('peak_assignment', [constants.DEFAULT_PEAK_ASSIGNMENT])[0]
+    query_peak_assignment = params.get('peak_assignment', constants.DEFAULT_PEAK_ASSIGNMENT)
     if query_peak_assignment not in constants.VALID_PEAK_ASSIGNMENTS:
         InvalidQueryParam("Invalid peak assignment.")
 
     # Internal Fragments Validation
-    query_internal_fragments = params.get('internal_fragments', [str(constants.DEFAULT_INTERNAL_FRAGMENTS)])[0]
+    query_internal_fragments = params.get('internal_fragments', str(constants.DEFAULT_INTERNAL_FRAGMENTS))
     if query_internal_fragments not in {'True', 'False'}:
         InvalidQueryParam("Internal fragments must be a boolean value.")
     query_internal_fragments = query_internal_fragments == 'True'
 
     # Minimum Intensity Validation
-    query_min_intensity = params.get('min_intensity', [str(constants.DEFAULT_MIN_INTENSITY)])[0]
+    query_min_intensity = params.get('min_intensity', str(constants.DEFAULT_MIN_INTENSITY))
     try:
         query_min_intensity = float(query_min_intensity)
         if query_min_intensity < 0:
@@ -156,36 +157,35 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam("Minimum intensity must be a number.")
 
     # Y-axis Scale Validation
-    query_y_axis_scale = params.get('y_axis_scale', [constants.DEFAULT_YAXIS_SCALE])[0]
+    query_y_axis_scale = params.get('y_axis_scale', constants.DEFAULT_YAXIS_SCALE)
     if query_y_axis_scale not in constants.VALID_Y_AXIS_SCALES:
         InvalidQueryParam("Invalid y-axis scale.")
 
     # Hide Unassigned Peaks Validation
-    query_hide_unassigned_peaks = params.get('hide_unassigned_peaks', [str(constants.DEFAULT_HIDE_UNASSIGNED_PEAKS)])[
-        0]
+    query_hide_unassigned_peaks = params.get('hide_unassigned_peaks', str(constants.DEFAULT_HIDE_UNASSIGNED_PEAKS))
     if query_hide_unassigned_peaks not in {'True', 'False'}:
         InvalidQueryParam("Hide unassigned peaks must be a boolean value.")
     query_hide_unassigned_peaks = query_hide_unassigned_peaks == 'True'
 
-    query_compression_algorithm = params.get('compression_algorithm', [constants.DEFAULT_COMPRESSION_ALGORITHM])[0]
+    query_compression_algorithm = params.get('compression_algorithm', constants.DEFAULT_COMPRESSION_ALGORITHM)
     if query_compression_algorithm not in constants.VALID_COMPRESSION_ALGORITHMS:
         InvalidQueryParam(f"Invalid compression algorithm: {query_compression_algorithm}")
 
-    query_spectra = params.get('spectra', [serialize_spectra(constants.DEFAULT_SPECTRA, query_compression_algorithm)])[0]
+    query_spectra = params.get('spectra', serialize_spectra(constants.DEFAULT_SPECTRA, query_compression_algorithm))
     query_spectra = deserialize_spectra(query_spectra, query_compression_algorithm)
     for s in query_spectra:
         if s[0] < 0 or s[1] < 0:
             InvalidQueryParam("Spectra must be non-negative numbers.")
 
     # Peak Picker Validation
-    query_peak_picker = params.get('peak_picker', [str(constants.DEFAULT_PEAK_PICKER)])[0]
+    query_peak_picker = params.get('peak_picker', str(constants.DEFAULT_PEAK_PICKER))
     if query_peak_picker not in {'True', 'False'}:
         InvalidQueryParam("Peak picker must be a boolean value.")
     query_peak_picker = query_peak_picker == 'True'
 
     # Peak Picker Minimum Intensity Validation
     query_peak_picker_min_intensity = \
-        params.get('peak_picker_min_intensity', [str(constants.DEFAULT_PEAK_PICKER_MIN_INTENSITY)])[0]
+        params.get('peak_picker_min_intensity', str(constants.DEFAULT_PEAK_PICKER_MIN_INTENSITY))
     try:
         query_peak_picker_min_intensity = float(query_peak_picker_min_intensity)
         if query_peak_picker_min_intensity < 0:
@@ -195,7 +195,7 @@ def parse_query_params(params) -> QueryParams:
 
     # Peak Picker Mass Tolerance Validation
     query_peak_picker_mass_tolerance = \
-        params.get('peak_picker_mass_tolerance', [str(constants.DEFAULT_PEAK_PICKER_MASS_TOLERANCE)])[0]
+        params.get('peak_picker_mass_tolerance', str(constants.DEFAULT_PEAK_PICKER_MASS_TOLERANCE))
     try:
         query_peak_picker_mass_tolerance = float(query_peak_picker_mass_tolerance)
         if query_peak_picker_mass_tolerance <= 0:
@@ -204,7 +204,7 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam("Peak picker mass tolerance must be a number.")
 
     # Neutral losses validation
-    query_neutral_losses = params.get('neutral_losses', [';'.join(constants.DEFAULT_NEUTRAL_LOSSES)])[0]
+    query_neutral_losses = params.get('neutral_losses', ';'.join(constants.DEFAULT_NEUTRAL_LOSSES))
     if query_neutral_losses == '':
         query_neutral_losses = []
     else:
@@ -214,7 +214,7 @@ def parse_query_params(params) -> QueryParams:
             if nl not in constants.NEUTRAL_LOSSES:
                 InvalidQueryParam(f"Invalid neutral loss: {nl}")
 
-    query_custom_losses = params.get('custom_losses', [';'.join(constants.DEFAULT_CUSTOM_LOSSES)])[0]
+    query_custom_losses = params.get('custom_losses', ';'.join(constants.DEFAULT_CUSTOM_LOSSES))
     if query_custom_losses == '':
         query_custom_losses = []
     else:
@@ -228,7 +228,7 @@ def parse_query_params(params) -> QueryParams:
                     InvalidQueryParam(f"Invalid custom loss: {nl}")
 
     # Isotopes validation
-    query_isotopes = params.get('isotopes', [str(constants.DEFAULT_ISOTOPES)])[0]
+    query_isotopes = params.get('isotopes', str(constants.DEFAULT_ISOTOPES))
     try:
         query_isotopes = int(query_isotopes)
         if query_isotopes < 0:
@@ -237,20 +237,20 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam("Isotopes must be an integer.")
 
     # Filter interrupted isotopes validation
-    query_filter_missing_mono = params.get('filter_missing_mono', [str(constants.DEFAULT_FILTER_MISSING_MONO)])[0]
+    query_filter_missing_mono = params.get('filter_missing_mono', str(constants.DEFAULT_FILTER_MISSING_MONO))
     if query_filter_missing_mono not in {'True', 'False'}:
         InvalidQueryParam("Filter interrupted isotopes must be a boolean value.")
     query_filter_missing_mono = query_filter_missing_mono == 'True'
 
     # Filter interrupted isotopes validation
     query_filter_interrupted_iso = \
-        params.get('filter_interrupted_iso', [str(constants.DEFAULT_FILTER_INTERRUPTED_ISO)])[0]
+        params.get('filter_interrupted_iso', str(constants.DEFAULT_FILTER_INTERRUPTED_ISO))
     if query_filter_interrupted_iso not in {'True', 'False'}:
         InvalidQueryParam("Filter interrupted isotopes must be a boolean value.")
     query_filter_interrupted_iso = query_filter_interrupted_iso == 'True'
 
     # validate min/max mz
-    query_min_mz = params.get('min_mz', [str(constants.DEFAULT_MIN_MZ)])[0]
+    query_min_mz = params.get('min_mz', str(constants.DEFAULT_MIN_MZ))
     try:
         query_min_mz = float(query_min_mz)
         if query_min_mz < 0:
@@ -258,7 +258,7 @@ def parse_query_params(params) -> QueryParams:
     except ValueError:
         InvalidQueryParam("Minimum m/z must be a number.")
 
-    query_max_mz = params.get('max_mz', [str(constants.DEFAULT_MAX_MZ)])[0]
+    query_max_mz = params.get('max_mz', str(constants.DEFAULT_MAX_MZ))
     try:
         query_max_mz = float(query_max_mz)
         if query_max_mz < 0:
@@ -266,7 +266,7 @@ def parse_query_params(params) -> QueryParams:
     except ValueError:
         InvalidQueryParam("Maximum m/z must be a number.")
 
-    query_aa_masses = deserialize_aa_masses(params.get('aa_masses', [serialize_aa_masses({})])[0])
+    query_aa_masses = deserialize_aa_masses(params.get('aa_masses', serialize_aa_masses({})))
     try:
         query_aa_masses = query_aa_masses
         if not isinstance(query_aa_masses, dict):
@@ -289,7 +289,7 @@ def parse_query_params(params) -> QueryParams:
 
 
     # validate min/max charge
-    query_min_charge = params.get('min_charge', [str(constants.DEFAULT_MIN_CHARGE)])[0]
+    query_min_charge = params.get('min_charge', str(constants.DEFAULT_MIN_CHARGE))
     try:
         query_min_charge = int(query_min_charge)
         if query_min_charge < 0:
@@ -297,7 +297,7 @@ def parse_query_params(params) -> QueryParams:
     except ValueError:
         InvalidQueryParam("Minimum charge must be an integer.")
 
-    query_max_charge = params.get('max_charge', [str(constants.DEFAULT_MAX_CHARGE)])[0]
+    query_max_charge = params.get('max_charge', str(constants.DEFAULT_MAX_CHARGE))
     try:
         query_max_charge = int(query_max_charge)
         if query_max_charge < 0:
@@ -307,7 +307,7 @@ def parse_query_params(params) -> QueryParams:
 
 
     # validate min intensity type
-    query_min_intensity_type = params.get('min_intensity_type', [str(constants.DEFAULT_MIN_INTENSITY_TYPE)])[0]
+    query_min_intensity_type = params.get('min_intensity_type', str(constants.DEFAULT_MIN_INTENSITY_TYPE))
     if query_min_intensity_type not in {'absolute', 'relative'}:
         InvalidQueryParam("Minimum intensity type must be 'absolute' or 'relative'.")
 
@@ -344,6 +344,7 @@ def parse_query_params(params) -> QueryParams:
 
 def generate_app_url(qp: QueryParams, comp, debug) -> str:
     base_url = constants.BASE_URL
+
     if debug:
         base_url = 'http://localhost:8501/'
 

@@ -15,14 +15,15 @@ import ms_deisotope
 import constants
 from color_util import get_color_dict
 from plot_util import generate_annonated_spectra_plotly, coverage_string, generate_fragment_plot, \
-    generate_fragment_plot_ion_type, generate_error_histogram
+    generate_fragment_plot_ion_type
 from query_params import parse_query_params, InvalidQueryParam, generate_app_url, QueryParams
+
+
 
 st.set_page_config(page_title="Spectra Viewer", page_icon=":glasses:", layout="wide")
 
-params = st.experimental_get_query_params()
 try:
-    qp = parse_query_params(params)
+    qp = parse_query_params(st.query_params)
 except InvalidQueryParam as e:
     st.error(str(e))
     st.stop()
