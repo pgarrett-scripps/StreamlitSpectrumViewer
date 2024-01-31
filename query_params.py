@@ -1,6 +1,7 @@
 import urllib
 
 import peptacular.constants
+import requests
 from peptacular.mass import valid_mass_sequence
 
 import constants
@@ -68,6 +69,17 @@ def serialize_spectra(spectra: List[Tuple[float, float]], compression_algorithm:
         return SpectrumCompressorUrl.compress(mzs, ints)
     elif compression_algorithm == 'lossy':
         return lossy_compressor.compress(mzs, ints)
+    elif compression_algorithm == 'key':
+        # Assuming 'spectra' is a list with one element that is the key
+        data = {"mzs": list(mzs), "intensities": list(ints)}
+
+        response = requests.post(f'{constants.COMP_API}/store', json=data)
+        if response.status_code == 200:
+            response_data = response.json()
+            return response_data.get("key")
+        else:
+            raise Exception("Failed to store spectra on the server")
+
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')
 
@@ -82,6 +94,14 @@ def deserialize_spectra(s: str, compression_algorithm: str) -> List[Tuple[float,
     elif compression_algorithm == 'lossy':
         mzs, ints = lossy_compressor.decompress(s)
         return list(zip(mzs, ints))
+    elif compression_algorithm == 'key':
+        # Assuming 'spectra' is a list with one element that is the key
+        response = requests.get(f'{constants.COMP_API}/retrieve/{s}')
+        if response.status_code == 200:
+            response_data = response.json()
+            return list(zip(response_data.get("mzs"), response_data.get("intensities")))
+        else:
+            raise Exception("Failed to retrieve spectra from the server")
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')
 
