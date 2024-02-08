@@ -19,7 +19,6 @@ from plot_util import generate_annonated_spectra_plotly, coverage_string, genera
 from query_params import parse_query_params, InvalidQueryParam, generate_app_url, QueryParams
 
 
-
 st.set_page_config(page_title="Spectra Viewer", page_icon=":glasses:", layout="wide")
 
 try:
@@ -783,7 +782,7 @@ if spectra:
 
     st.subheader('Stats')
 
-    # calculate percerntage if intensity accounted for
+    # calculate percentage if intensity accounted for
     total_intensity = spectra_df['intensity'].sum()
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(label='Total Intensity', value=round(total_intensity, 1))
