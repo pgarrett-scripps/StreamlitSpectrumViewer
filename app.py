@@ -151,10 +151,17 @@ with st.sidebar:
                 fragment_types.add(label)
             update_fragment_types(label, ion_selected)
 
-    internal_fragments = st.checkbox(
+
+    c1, c2 = st.columns(2)
+    internal_fragments = c1.checkbox(
         label='Internal Fragments',
         value=qp.internal_fragments,
         help=constants.INTERNAL_FRAGMENTS_HELP)
+
+    immonium_ions = c2.checkbox(
+        label='Immonium Ions',
+        value=qp.immonium_ions,
+        help=constants.IMMONIUM_IONS_HELP)
 
     st.caption('Neutral Losses')
     cols = st.columns(len(constants.NEUTRAL_LOSSES))
@@ -308,6 +315,21 @@ with st.sidebar:
             help=constants.MIN_INTENSITY_HELP
         )
 
+        c1, c2 = st.columns(2)
+        top_n = c1.number_input(
+            label='Top N',
+            value=qp.top_n,
+            min_value=0,
+            help=constants.TOP_N_HELP
+        )
+
+        bottom_n = c2.number_input(
+            label='Bottom N',
+            value=qp.bottom_n,
+            min_value=0,
+            help=constants.BOTTOM_N_HELP
+        )
+
         spectra = st.text_area(
             label='Spectra',
             value='\n'.join(f'{s[0]} {s[1]}' for s in qp.spectra),
@@ -384,7 +406,10 @@ qp_new = QueryParams(
     compression_algorithm=compression_algorithm,
     min_intensity_type=min_intensity_type,
     min_charge=min_charge,
-    max_charge=max_charge
+    max_charge=max_charge,
+    top_n=top_n,
+    bottom_n=bottom_n,
+    immonium_ions=immonium_ions
 )
 
 if mass_tolerance_type == 'th' and mass_tolerance > 1:
@@ -401,11 +426,18 @@ for i in constants.IONS:
             ion_types.append(i)
             charges.append(c)
 
-# Show Analysis URL
+
+
+# Show Analysis URL with improved aesthetics
 url = generate_app_url(qp_new, qp.compression_algorithm, debug=debug)
 url_chars = len(url)
-st.write(f'##### [Analysis URL]({url}) (copy me and send to your friends!)')
-st.write(f'Url Length: {url_chars} characters, {round(url_chars / 1024, 2)} KB')
+# Use an emoji to make the link more noticeable
+st.subheader(f'[Share with your friends!]({url}) [🔗]({url})')
+
+# Add an emoji to signify information about URL length
+st.write(f'Url Length: {url_chars} characters, 📏 {round(url_chars / 1024, 2)} KB')
+
+st.markdown('---')
 
 # Show Sequence Info
 st.header(sequence)
@@ -427,7 +459,6 @@ def build_fragments_cached(*args, **kwargs):
     return build_fragments(*args, **kwargs)
 
 
-
 fragments = []
 for ion, charge in zip(ion_types, charges):
     fragments.extend(build_fragments_cached(sequence=sequence,
@@ -437,10 +468,10 @@ for ion, charge in zip(ion_types, charges):
                                             internal=internal_fragments,
                                             isotopes=list(range(isotopes + 1)),
                                             losses=losses,
-                                            aa_masses=aa_masses))
+                                            aa_masses=aa_masses,
+                                            immonium=immonium_ions))
 
 frag_df = pd.DataFrame([fragment.to_dict() for fragment in fragments])
-
 
 #frag_df, fragments = get_fragments(ion_types, charges, sequence, mass_type, internal_fragments, isotopes, losses, aa_masses)
 
@@ -456,6 +487,15 @@ if spectra:
                                                                    peak_picker_mass_tolerance))
         mzs = [float(peak.mz) for peak in deconvoluted_peaks]
         ints = [float(peak.intensity) for peak in deconvoluted_peaks]
+
+    # Take top n peaks and bottom n peaks
+    top_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1], reverse=True)[:top_n]
+    bottom_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1])[:bottom_n]
+
+    # Combine ensuring no duplicates - since it's a list of tuples, we can use a dictionary to remove duplicates efficiently
+    spectra_dict = {mz: intensity for mz, intensity in top_n_spectra + bottom_n_spectra}
+    spectra = list(spectra_dict.items())
+    mzs, ints = zip(*spectra)
 
     max_spectra_mz = max(mzs)
 
@@ -604,6 +644,9 @@ if spectra:
     labels = [create_labels(row) for _, row in spectra_df.iterrows()]
     spectra_df['ion_label'], spectra_df['color_label'] = zip(*labels)
 
+    spectra_df.loc[spectra_df['ion_type'] == 'I', 'label'] = spectra_df.loc[
+        spectra_df['ion_type'] == 'I', 'sequence'].values
+
     # Assigning colors based on color labels
     spectra_df['color'] = [color_dict[label] for label in spectra_df['color_label']]
 
@@ -621,9 +664,11 @@ if spectra:
         if ion in 'abc':
             for num in nums:
                 cov_arr[num - 1] = 1
-        else:
+        elif ion in 'xyz':
             for num in nums:
                 cov_arr[len(unmodified_sequence) - (num - 1) - 1] = 1
+        else:
+            continue
 
         if len(cov_arr) > 0:
             c = color_dict[get_ion_label(ion, charge)]

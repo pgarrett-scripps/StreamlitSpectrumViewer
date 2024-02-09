@@ -12,7 +12,9 @@ from typing import Set, Tuple, List, Dict
 from msms_compression import SpectrumCompressorF32LzstringUri, SpectrumCompressorUrl
 
 from msms_compression import BaseCompressor, url_encoder, SpectrumCompressorI32, brotli_compressor
+
 lossy_compressor = BaseCompressor(SpectrumCompressorI32(2, 1), brotli_compressor, url_encoder)
+
 
 @dataclasses.dataclass
 class QueryParams:
@@ -42,6 +44,9 @@ class QueryParams:
     min_intensity_type: str
     min_charge: int
     max_charge: int
+    top_n: int
+    bottom_n: int
+    immonium_ions: bool
 
 
 class InvalidQueryParam(Exception):
@@ -307,7 +312,6 @@ def parse_query_params(params) -> QueryParams:
     else:
         query_aa_masses = {**peptacular.constants.MONO_ISOTOPIC_AA_MASSES, **query_aa_masses}
 
-
     # validate min/max charge
     query_min_charge = params.get('min_charge', str(constants.DEFAULT_MIN_CHARGE))
     try:
@@ -325,11 +329,35 @@ def parse_query_params(params) -> QueryParams:
     except ValueError:
         InvalidQueryParam("Maximum charge must be an integer.")
 
-
     # validate min intensity type
     query_min_intensity_type = params.get('min_intensity_type', str(constants.DEFAULT_MIN_INTENSITY_TYPE))
     if query_min_intensity_type not in {'absolute', 'relative'}:
         InvalidQueryParam("Minimum intensity type must be 'absolute' or 'relative'.")
+
+    # validate top n peaks
+    query_top_n_peaks = params.get('top_n_peaks', str(constants.DEFAULT_TOP_N_PEAKS))
+    try:
+        query_top_n_peaks = int(query_top_n_peaks)
+        if query_top_n_peaks < 0:
+            InvalidQueryParam("Top N peaks must be a non-negative integer.")
+
+    except ValueError:
+        InvalidQueryParam("Top N peaks must be an integer.")
+
+    # validate bottom n peaks
+    query_bottom_n_peaks = params.get('bottom_n_peaks', str(constants.DEFAULT_BOTTOM_N_PEAKS))
+    try:
+        query_bottom_n_peaks = int(query_bottom_n_peaks)
+        if query_bottom_n_peaks < 0:
+            InvalidQueryParam("Bottom N peaks must be a non-negative integer.")
+    except ValueError:
+        InvalidQueryParam("Bottom N peaks must be an integer.")
+
+    # validate immonium ions
+    query_immonium_ions = params.get('immonium_ions', str(constants.DEFAULT_IMMONIUM_IONS))
+    if query_immonium_ions not in {'True', 'False'}:
+        InvalidQueryParam("Immonium ions must be a boolean value.")
+    query_immonium_ions = query_immonium_ions == 'True'
 
 
     return QueryParams(
@@ -359,6 +387,9 @@ def parse_query_params(params) -> QueryParams:
         min_charge=query_min_charge,
         max_charge=query_max_charge,
         min_intensity_type=query_min_intensity_type,
+        top_n=query_top_n_peaks,
+        bottom_n=query_bottom_n_peaks,
+        immonium_ions=query_immonium_ions,
     )
 
 
@@ -369,7 +400,8 @@ def generate_app_url(qp: QueryParams, comp, debug) -> str:
         base_url = 'http://localhost:8501/'
 
     default_aa_masses = peptacular.constants.AVERAGE_AA_MASSES if qp.mass_type == 'average' else peptacular.constants.MONO_ISOTOPIC_AA_MASSES
-    diff_aa_masses = {aa: mass for aa, mass in qp.aa_masses.items() if aa not in default_aa_masses or default_aa_masses[aa] != mass}
+    diff_aa_masses = {aa: mass for aa, mass in qp.aa_masses.items() if
+                      aa not in default_aa_masses or default_aa_masses[aa] != mass}
 
     params = {}
     if qp.sequence != constants.DEFAULT_SEQUENCE:
@@ -424,8 +456,12 @@ def generate_app_url(qp: QueryParams, comp, debug) -> str:
         params['compression_algorithm'] = qp.compression_algorithm
     if qp.spectra != deserialize_spectra(serialize_spectra(constants.DEFAULT_SPECTRA, comp), comp):
         params['spectra'] = serialize_spectra(qp.spectra, qp.compression_algorithm)
-
-
+    if qp.top_n != constants.DEFAULT_TOP_N_PEAKS:
+        params['top_n'] = str(qp.top_n)
+    if qp.bottom_n != constants.DEFAULT_BOTTOM_N_PEAKS:
+        params['bottom_n'] = str(qp.bottom_n)
+    if qp.immonium_ions != constants.DEFAULT_IMMONIUM_IONS:
+        params['query_immonium_ions'] = qp.immonium_ions
 
     """params = {'sequence': urllib.parse.quote(qp.sequence),
         'mass_type': qp.mass_type,
@@ -454,4 +490,3 @@ def generate_app_url(qp: QueryParams, comp, debug) -> str:
 
     query_string = '&'.join([f'{key}={value}' for key, value in params.items() if value is not None])
     return f'{base_url}?{query_string}'
-

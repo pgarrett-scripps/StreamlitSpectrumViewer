@@ -46,16 +46,16 @@ def get_color_for_state(ion, charge, min_charge, max_charge, format_type='hex'):
     }
 
     def get_pos(c):
-        return (c-min_charge) / (max_charge-min_charge)
+        return (c - min_charge) / (max_charge - min_charge)
 
     color_map_lamdas = {
-        'i': lambda x: get_pos(x)*0.4,
-        'a': lambda x: (1-get_pos(x))*0.27,
-        'b': lambda x: (1-get_pos(x))*0.55,
-        'c': lambda x: 0.75 + (get_pos(x))*0.25,
-        'x': lambda x: (1-get_pos(x))*0.2 + 0.1,
-        'y': lambda x: 0.7 + (get_pos(x))*0.2,
-        'z': lambda x: (1-get_pos(x))*0.3,
+        'i': lambda x: get_pos(x) * 0.4,
+        'a': lambda x: (1 - get_pos(x)) * 0.27,
+        'b': lambda x: (1 - get_pos(x)) * 0.55,
+        'c': lambda x: 0.75 + (get_pos(x)) * 0.25,
+        'x': lambda x: (1 - get_pos(x)) * 0.2 + 0.1,
+        'y': lambda x: 0.7 + (get_pos(x)) * 0.2,
+        'z': lambda x: (1 - get_pos(x)) * 0.3,
     }
 
     # Get the colormap for the category
@@ -67,6 +67,7 @@ def get_color_for_state(ion, charge, min_charge, max_charge, format_type='hex'):
     # Get the color from the colormap
     return convert_color(cmap(color_pos), format_type=format_type)
 
+
 def get_color_dict(min_charge, max_charge):
     """
     Get a dictionary of colors for each state.
@@ -76,8 +77,11 @@ def get_color_dict(min_charge, max_charge):
     :return: Dictionary of colors for each state
     """
     ion_to_color = {'unassigned': 'grey'}
-    for ion in 'abcxyzi':
+    for ion in 'abcxyziI':
         for charge in range(min_charge, max_charge + 1):
-            ion_to_color[f'{"+"*charge}{ion}'] = get_color_for_state(ion, charge, min_charge, max_charge)
+            if ion == 'I':
+                ion_to_color[f'{"+" * charge}{ion}'] = 'pink'
+            else:
+                ion_to_color[f'{"+" * charge}{ion}'] = get_color_for_state(ion, charge, min_charge, max_charge)
 
     return ion_to_color

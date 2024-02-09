@@ -36,6 +36,10 @@ DEFAULT_FILTER_MISSING_MONO = False
 DEFAULT_FILTER_INTERRUPTED_ISO = False
 DEFAULT_MIN_MZ = 0.0
 DEFAULT_MAX_MZ = 10_000.0
+DEFAULT_BOTTOM_N_PEAKS = 0
+DEFAULT_TOP_N_PEAKS = 1_000_000
+DEFAULT_IMMONIUM_IONS = True
+
 COLOR_DICT = {'+i': 'mediumvioletred', '++i': 'palevioletred', '+++i': 'hotpink', '++++i': 'hotpink',
               '+++++i': 'hotpink',
               '+a': 'brown', '++a': 'chocolate', '+++a': 'sandybrown', '++++a': 'sandybrown', '+++++a': 'sandybrown',
@@ -295,3 +299,9 @@ MIN_MZ_HELP = "Set the minimum m/z value to be considered in the analysis."
 MAX_MZ_HELP = "Set the maximum m/z value to be considered in the analysis."
 
 SPECTRA_HELP = "Enter the MS2 spectra data in the format 'm/z intensity', each pair on a new line."
+
+TOP_N_HELP = "Set the number of top peaks to be considered in the analysis."
+
+BOTTOM_N_HELP = "Set the number of bottom peaks to be considered in the analysis."
+
+IMMONIUM_IONS_HELP = "Check this box to include immonium ions in the analysis."
