@@ -480,11 +480,12 @@ for i in constants.INTERNAL_IONS:
 # Show Analysis URL with improved aesthetics
 url = generate_app_url(qp_new, qp.compression_algorithm, debug=debug)
 url_chars = len(url)
+c1, c2 = st.columns([7, 3])
 # Use an emoji to make the link more noticeable
-st.write(f'[Sharable URL]({url})')
+c1.write(f'##### :link: [Sharable URL]({url})')
 
 # Add an emoji to signify information about URL length
-st.write(f'Url Length: {url_chars} characters, 📏 {round(url_chars / 1024, 2)} KB')
+c2.caption(f'Url Length: {url_chars} characters, 📏 {round(url_chars / 1024, 2)} KB')
 
 st.markdown('---')
 
