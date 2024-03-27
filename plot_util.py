@@ -48,7 +48,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
                                             f"<br>Sequence: {row['sequence']}<br>Label: {row['label']}"
                                             f"<br>Intensity: {row['intensity']}<br>Isotope: {row['isotope']}"
                                             f"<br>Internal: {row['internal']}<br>Ion Type: {row['ion_type']}"
-                                            f"<br>loss: {row['loss']}<br>Fragment M/Z: {row['fragment_mz']}",
+                                            f"<br>loss: {row['loss']}<br>Fragment M/Z: {row['theo_mz']}",
                                    axis=1)
 
         # Create the Spectra Plot
@@ -83,7 +83,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
                                             f"<br>Sequence: {row['sequence']}<br>Label: {row['label']}"
                                             f"<br>Intensity: {row['intensity']}<br>Isotope: {row['isotope']}"
                                             f"<br>Internal: {row['internal']}<br>Ion Type: {row['ion_type']}"
-                                            f"<br>loss: {row['loss']}<br>Fragment M/Z: {row['fragment_mz']}",
+                                            f"<br>loss: {row['loss']}<br>Fragment M/Z: {row['theo_mz']}",
                                    axis=1)
 
         fig_error.add_trace(go.Scatter(x=tmp_df['mz'],

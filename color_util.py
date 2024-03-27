@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import colorsys
 
+import peptacular as pt
+
 
 def convert_color(color, format_type='hex'):
     """
@@ -34,9 +36,18 @@ def get_color_for_state(ion, charge, min_charge, max_charge, format_type='hex'):
     :param max_charge: Maximum state in the dataset
     :return: Color for the given state
     """
+
     # Define colormaps for each category
     colormaps = {
-        'i': plt.cm.spring,
+        'ax': plt.cm.spring,
+        'ay': plt.cm.spring,
+        'az': plt.cm.spring,
+        'bx': plt.cm.spring,
+        'by': plt.cm.spring,
+        'bz': plt.cm.spring,
+        'cx': plt.cm.spring,
+        'cy': plt.cm.spring,
+        'cz': plt.cm.spring,
         'a': plt.cm.BrBG,
         'b': plt.cm.winter,
         'c': plt.cm.PRGn,
@@ -49,7 +60,15 @@ def get_color_for_state(ion, charge, min_charge, max_charge, format_type='hex'):
         return (c - min_charge) / (max_charge - min_charge)
 
     color_map_lamdas = {
-        'i': lambda x: get_pos(x) * 0.4,
+        'ax': lambda x: get_pos(x) * 0.4,
+        'ay': lambda x: get_pos(x) * 0.4,
+        'az': lambda x: get_pos(x) * 0.4,
+        'bx': lambda x: get_pos(x) * 0.4,
+        'by': lambda x: get_pos(x) * 0.4,
+        'bz': lambda x: get_pos(x) * 0.4,
+        'cx': lambda x: get_pos(x) * 0.4,
+        'cy': lambda x: get_pos(x) * 0.4,
+        'cz': lambda x: get_pos(x) * 0.4,
         'a': lambda x: (1 - get_pos(x)) * 0.27,
         'b': lambda x: (1 - get_pos(x)) * 0.55,
         'c': lambda x: 0.75 + (get_pos(x)) * 0.25,
@@ -77,9 +96,9 @@ def get_color_dict(min_charge, max_charge):
     :return: Dictionary of colors for each state
     """
     ion_to_color = {'unassigned': 'grey'}
-    for ion in 'abcxyziI':
+    for ion in pt.VALID_ION_TYPES:
         for charge in range(min_charge, max_charge + 1):
-            if ion == 'I':
+            if ion == 'i':
                 ion_to_color[f'{"+" * charge}{ion}'] = 'pink'
             else:
                 ion_to_color[f'{"+" * charge}{ion}'] = get_color_for_state(ion, charge, min_charge, max_charge)

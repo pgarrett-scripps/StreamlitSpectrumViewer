@@ -1,13 +1,11 @@
 # TODO: Add loss analysis plot
 
 import tempfile
+from typing import List
 
 import pandas as pd
-import peptacular.sequence
 import streamlit as st
-from peptacular.fragment import build_fragments
-from peptacular.mass import calculate_mass, calculate_mz
-from peptacular.score import compute_fragment_matches
+import peptacular as pt
 
 import matplotlib as mpl
 import ms_deisotope
@@ -18,8 +16,7 @@ from plot_util import generate_annonated_spectra_plotly, coverage_string, genera
     generate_fragment_plot_ion_type
 from query_params import parse_query_params, InvalidQueryParam, generate_app_url, QueryParams
 
-
-st.set_page_config(page_title="Spectra Viewer", page_icon=":glasses:", layout="wide")
+st.set_page_config(page_title="Spectra Viewer", page_icon=":eyeglasses:", layout="wide")
 
 try:
     qp = parse_query_params(st.query_params)
@@ -29,9 +26,12 @@ except InvalidQueryParam as e:
 
 # Initialize session state for fragment types if it doesn't exist (page refresh)
 if 'fragment_types' not in st.session_state:
-    st.balloons()
     st.session_state.fragment_types = set()
     st.session_state.fragment_types.update(qp.fragment_types)
+
+if 'internal_fragment_types' not in st.session_state:
+    st.session_state.internal_fragment_types = set()
+    st.session_state.internal_fragment_types.update(qp.internal_fragment_types)
 
 
 def update_fragment_types(label, is_checked):
@@ -39,6 +39,13 @@ def update_fragment_types(label, is_checked):
         st.session_state.fragment_types.add(label)
     elif label in st.session_state.fragment_types:
         st.session_state.fragment_types.remove(label)
+
+
+def update_internal_fragment_types(label, is_checked):
+    if is_checked:
+        st.session_state.internal_fragment_types.add(label)
+    elif label in st.session_state.internal_fragment_types:
+        st.session_state.internal_fragment_types.remove(label)
 
 
 def get_ion_label_superscript(i: str, c: int) -> str:
@@ -92,6 +99,7 @@ def generate_fragmentation_latex(peptide, forward_indices, reverse_indices):
     # Join all parts into a single string and return
     return ''.join(latex_parts)
 
+
 # Add query option for selected mass_tolerance to st.session_state. This fixes the issue when switching between ppm
 # and th mass tolerance types, and causes the mass tolerance to be too large / too small
 if qp.mass_tolerance_type == 'ppm' and 'ppm_mass_error' not in st.session_state:
@@ -111,95 +119,15 @@ def get_ion_label(i: str, c: int) -> str:
 with st.sidebar:
     st.title('Spectra Viewer')
 
-    sequence = st.text_input(label='Sequence',
+    st.caption('A tool to visualize peptide fragmentation spectra. Ensure to click the "Apply" button to update the '
+                'visualization.')
+
+    st.caption('Made with [Peptacular](https://pypi.org/project/peptacular/).')
+
+    sequence = st.text_input(label='Sequence (Proforma2.0 Notation)',
                              value=qp.sequence,
                              help=constants.SEQUENCE_HELP).replace(' ', '')
-    unmodified_sequence = peptacular.sequence.strip_modifications(sequence)
-
-    c1, c2 = st.columns(2)
-    min_charge = c1.number_input(label='Min Charge',
-                                 value=qp.min_charge,
-                                 min_value=constants.MIN_CHARGE,
-                                 max_value=constants.MAX_CHARGE)
-
-    max_charge = c2.number_input(label='Max Charge',
-                                 value=qp.max_charge,
-                                 min_value=constants.MIN_CHARGE,
-                                 max_value=constants.MAX_CHARGE)
-
-    color_dict = get_color_dict(min_charge, max_charge)
-
-    c1, c2 = st.columns(2)
-    deselected_all = c1.button(label='Deselect All')
-    select_all = c2.button(label='Select All')
-
-    st.write('Ions')
-    fragment_types = set()
-    for i in constants.IONS:
-        cols = st.columns(max_charge - min_charge + 1)
-        for c, col in enumerate(cols, min_charge):
-            label = get_ion_label(i, c)
-            val = label in st.session_state.fragment_types
-            if deselected_all:
-                val = False
-            if select_all:
-                val = True
-            ion_selected = col.checkbox(label=get_ion_label_superscript(i, c),
-                                        value=val,
-                                        key=label)
-            if ion_selected:
-                fragment_types.add(label)
-            update_fragment_types(label, ion_selected)
-
-
-    c1, c2 = st.columns(2)
-    internal_fragments = c1.checkbox(
-        label='Internal Fragments',
-        value=qp.internal_fragments,
-        help=constants.INTERNAL_FRAGMENTS_HELP)
-
-    immonium_ions = c2.checkbox(
-        label='Immonium Ions',
-        value=qp.immonium_ions,
-        help=constants.IMMONIUM_IONS_HELP)
-
-    st.caption('Neutral Losses')
-    cols = st.columns(len(constants.NEUTRAL_LOSSES))
-    losses = [0.0]
-    neutral_losses = []
-    for i, (nl, mass) in enumerate(constants.NEUTRAL_LOSSES.items()):
-        l = cols[i].checkbox(
-            label=nl,
-            value=nl in qp.neutral_losses,
-            key=nl
-        )
-        if l:
-            losses.append(mass)
-            neutral_losses.append(nl)
-
-    custom_losses = st.text_input(
-        label='Custom Losses',
-        value=';'.join([str(l) for l in qp.custom_losses]),
-        help=constants.CUSTOM_LOSSES_HELP
-    )
-
-    if custom_losses:
-        custom_losses = [float(x) for x in custom_losses.split(';')]
-        losses.extend(custom_losses)
-
-    c1, c2 = st.columns(2)
-    mass_type = c1.selectbox(
-        label='Mass Type',
-        options=['monoisotopic', 'average'],
-        index=0 if qp.mass_type == 'monoisotopic' else 1,
-        help=constants.MASS_TYPE_HELP
-    )
-
-    peak_assignment = c2.selectbox(
-        label='Peak Assignment',
-        options=['largest', 'closest'],
-        index=0 if qp.peak_assignment == 'largest' else 1,
-        help=constants.PEAK_ASSIGNMENT_HELP)
+    unmodified_sequence = pt.strip_mods(sequence)
 
     c1, c2 = st.columns(2)
     mass_tolerance_type = c1.selectbox(
@@ -222,137 +150,247 @@ with st.sidebar:
     else:
         st.session_state['th_mass_error'] = mass_tolerance
 
-    with st.expander('Plot Options'):
-
-        c1, c2 = st.columns(2)
-
-        y_axis_scale = c1.radio(
-            label='Y Axis Scale',
-            options=['linear', 'log'],
-            horizontal=True,
-            index=0 if qp.y_axis_scale == 'linear' else 1,
-            help=constants.Y_AXIS_SCALE_HELP
-        )
-
-        hide_unassigned_peaks = c2.checkbox(
-            label='Hide Unassigned Peaks',
-            value=qp.hide_unassigned_peaks,
-            help=constants.HIDE_UNASSIGNED_PEAKS_HELP
-        )
-
-    with st.expander('Isotopes'):
-
-        isotopes = st.number_input(
-            label='Isotopes',
-            value=qp.isotopes,
-            min_value=0,
-            max_value=5,
-            help=constants.ISOTOPES_HELP
-        )
-
-        c1, c2 = st.columns(2)
-        filter_missing_mono = c1.checkbox(
-            label='Filter missing mono peaks',
-            value=qp.filter_missing_mono,
-            help=constants.FILTER_MISSING_MONO_HELP
-        )
-        filter_interrupted_iso = c2.checkbox(
-            label='Filter interrupted isotopes',
-            value=qp.filter_interrupted_iso,
-            help=constants.FILTER_INTERRUPTED_ISO_HELP
-        )
-
-    with st.expander('Peak Picker'):
-
-        peak_picker = st.checkbox(
-            label='Peak Picker',
-            value=qp.peak_picker,
-            help=constants.PEAK_PICKER_HELP)
-
-        c1, c2 = st.columns(2)
-        peak_picker_min_intensity = c1.number_input(
-            label='Peak Picker Min Intensity',
-            value=qp.peak_picker_min_intensity,
-            min_value=0.0,
-            max_value=1e9,
-            help=constants.PEAK_PICKER_MIN_INTENSITY_HELP)
-        peak_picker_mass_tolerance = c2.number_input(
-            label='Peak Picker Mass Tolerance',
-            value=qp.peak_picker_mass_tolerance,
-            min_value=0.0,
-            max_value=1e9,
-            help=constants.PEAK_PICKER_MASS_TOLERANCE_HELP)
-
-    with st.expander('Spectra'):
-        c1, c2 = st.columns(2)
-        min_mz = c1.number_input(
-            label='Min m/z',
-            value=qp.min_mz,
-            min_value=0.0,
-            max_value=1e9,
-            help=constants.MIN_MZ_HELP
-        )
-        max_mz = c2.number_input(
-            label='Max m/z',
-            value=qp.max_mz,
-            min_value=0.0,
-            max_value=1e9,
-            help=constants.MAX_MZ_HELP
-        )
-
-        c1, c2 = st.columns(2)
-        min_intensity_type = c1.selectbox(
-            label='Min Intensity Type',
-            options=constants.VALID_MIN_INTENSITY_TYPES,
-            index=constants.VALID_MIN_INTENSITY_TYPES.index(qp.min_intensity_type),
-        )
-
-        min_intensity = c2.number_input(
-            label='Min Intensity',
-            value=qp.min_intensity,
-            min_value=0.0,
-            max_value=1e9,
-            help=constants.MIN_INTENSITY_HELP
-        )
-
-        c1, c2 = st.columns(2)
-        top_n = c1.number_input(
-            label='Top N',
-            value=qp.top_n,
-            min_value=0,
-            help=constants.TOP_N_HELP
-        )
-
-        bottom_n = c2.number_input(
-            label='Bottom N',
-            value=qp.bottom_n,
-            min_value=0,
-            help=constants.BOTTOM_N_HELP
-        )
-
-        spectra = st.text_area(
-            label='Spectra',
-            value='\n'.join(f'{s[0]} {s[1]}' for s in qp.spectra),
-            help=constants.SPECTRA_HELP
-        )
-
-        compression_algorithm = st.selectbox(
-            label='Compression Algorithm',
-            options=constants.VALID_COMPRESSION_ALGORITHMS,
-            index=constants.VALID_COMPRESSION_ALGORITHMS.index(qp.compression_algorithm),
-        )
-
-    with st.expander('AA Masses'):
-        aa_masses = eval(st.text_area(
-            label='AA Masses',
-            value=str(qp.aa_masses),
-        ))
-
-    debug = st.checkbox(
-        label='Debug',
-        value=False
+    spectra = st.text_area(
+        label='Spectra (mz Intensity)',
+        value='\n'.join(f'{s[0]} {s[1]}' for s in qp.spectra),
+        help=constants.SPECTRA_HELP,
+        height=200,
     )
 
+    st.subheader('Fragmentation Options')
+
+    c1, c2 = st.columns(2)
+    min_charge = c1.number_input(label='Min Charge',
+                                 value=qp.min_charge,
+                                 min_value=constants.MIN_CHARGE,
+                                 max_value=constants.MAX_CHARGE)
+
+    max_charge = c2.number_input(label='Max Charge',
+                                 value=qp.max_charge,
+                                 min_value=constants.MIN_CHARGE,
+                                 max_value=constants.MAX_CHARGE)
+
+    color_dict = get_color_dict(min_charge, max_charge)
+
+    c1, c2 = st.columns(2)
+    deselected_all = c1.button(label='Deselect All Ions', use_container_width=True)
+    select_all = c2.button(label='Select All Ions', use_container_width=True)
+
+    with st.form(key='query_form'):
+
+        c1, c2 = st.columns(2)
+
+        c1.subheader('Options Form')
+        c2.form_submit_button(label='Apply', use_container_width=True)
+
+        st.write('Terminal Ions')
+        fragment_types = set()
+        for i in constants.IONS:
+            cols = st.columns(max_charge - min_charge + 1)
+            for c, col in enumerate(cols, min_charge):
+                label = get_ion_label(i, c)
+                val = label in st.session_state.fragment_types
+                if deselected_all:
+                    val = False
+                if select_all:
+                    val = True
+                ion_selected = col.checkbox(label=get_ion_label_superscript(i, c),
+                                            value=val,
+                                            key=label)
+                if ion_selected:
+                    fragment_types.add(label)
+                update_fragment_types(label, ion_selected)
+
+        immonium_ions = st.checkbox(
+            label='Immonium Ions',
+            value=qp.immonium_ions,
+            help=constants.IMMONIUM_IONS_HELP)
+
+
+        internal_fragment_types = set()
+        with st.expander('Internal Ions'):
+            st.write('Internal Ions')
+            for i in constants.INTERNAL_IONS:
+                cols = st.columns(max_charge - min_charge + 1)
+                for c, col in enumerate(cols, min_charge):
+                    label = get_ion_label(i, c)
+                    val = label in st.session_state.internal_fragment_types
+                    if deselected_all:
+                        val = False
+                    ion_selected = col.checkbox(label=get_ion_label_superscript(i, c),
+                                                value=val,
+                                                key=label)
+                    if ion_selected:
+                        internal_fragment_types.add(label)
+
+                    update_internal_fragment_types(label, ion_selected)
+
+        internal_fragments = len(internal_fragment_types) > 0
+
+
+        st.caption('Neutral Losses')
+        cols = st.columns(len(constants.NEUTRAL_LOSSES))
+        losses = [0.0]
+        neutral_losses = []
+        for i, (nl, mass) in enumerate(constants.NEUTRAL_LOSSES.items()):
+            l = cols[i].checkbox(
+                label=nl,
+                value=nl in qp.neutral_losses,
+                key=nl
+            )
+            if l:
+                losses.append(mass)
+                neutral_losses.append(nl)
+
+        custom_losses = st.text_input(
+            label='Custom Losses',
+            value=';'.join([str(l) for l in qp.custom_losses]),
+            help=constants.CUSTOM_LOSSES_HELP
+        )
+
+        if custom_losses:
+            custom_losses = [float(x) for x in custom_losses.split(';')]
+            losses.extend(custom_losses)
+
+        c1, c2 = st.columns(2)
+        mass_type = c1.selectbox(
+            label='Mass Type',
+            options=['monoisotopic', 'average'],
+            index=0 if qp.mass_type == 'monoisotopic' else 1,
+            help=constants.MASS_TYPE_HELP
+        )
+
+        peak_assignment = c2.selectbox(
+            label='Peak Assignment',
+            options=['largest', 'closest'],
+            index=0 if qp.peak_assignment == 'largest' else 1,
+            help=constants.PEAK_ASSIGNMENT_HELP)
+
+
+        with st.expander('Isotopes'):
+
+            isotopes = st.number_input(
+                label='Isotopes',
+                value=qp.isotopes,
+                min_value=0,
+                max_value=5,
+                help=constants.ISOTOPES_HELP
+            )
+
+            c1, c2 = st.columns(2)
+            filter_missing_mono = c1.checkbox(
+                label='Filter missing mono peaks',
+                value=qp.filter_missing_mono,
+                help=constants.FILTER_MISSING_MONO_HELP
+            )
+            filter_interrupted_iso = c2.checkbox(
+                label='Filter interrupted isotopes',
+                value=qp.filter_interrupted_iso,
+                help=constants.FILTER_INTERRUPTED_ISO_HELP
+            )
+
+        with st.expander('Plot Options'):
+
+            c1, c2 = st.columns(2)
+
+            y_axis_scale = c1.radio(
+                label='Y Axis Scale',
+                options=['linear', 'log'],
+                horizontal=True,
+                index=0 if qp.y_axis_scale == 'linear' else 1,
+                help=constants.Y_AXIS_SCALE_HELP
+            )
+
+            hide_unassigned_peaks = c2.checkbox(
+                label='Hide Unassigned Peaks',
+                value=qp.hide_unassigned_peaks,
+                help=constants.HIDE_UNASSIGNED_PEAKS_HELP
+            )
+
+        with st.expander('Peak Picker'):
+
+            peak_picker = st.checkbox(
+                label='Peak Picker',
+                value=qp.peak_picker,
+                help=constants.PEAK_PICKER_HELP)
+
+            c1, c2 = st.columns(2)
+            peak_picker_min_intensity = c1.number_input(
+                label='Peak Picker Min Intensity',
+                value=qp.peak_picker_min_intensity,
+                min_value=0.0,
+                max_value=1e9,
+                help=constants.PEAK_PICKER_MIN_INTENSITY_HELP)
+            peak_picker_mass_tolerance = c2.number_input(
+                label='Peak Picker Mass Tolerance',
+                value=qp.peak_picker_mass_tolerance,
+                min_value=0.0,
+                max_value=1e9,
+                help=constants.PEAK_PICKER_MASS_TOLERANCE_HELP)
+
+        with st.expander('Spectra Options'):
+            c1, c2 = st.columns(2)
+            min_mz = c1.number_input(
+                label='Min m/z',
+                value=qp.min_mz,
+                min_value=0.0,
+                max_value=1e9,
+                help=constants.MIN_MZ_HELP
+            )
+            max_mz = c2.number_input(
+                label='Max m/z',
+                value=qp.max_mz,
+                min_value=0.0,
+                max_value=1e9,
+                help=constants.MAX_MZ_HELP
+            )
+
+            c1, c2 = st.columns(2)
+            min_intensity_type = c1.selectbox(
+                label='Min Intensity Type',
+                options=constants.VALID_MIN_INTENSITY_TYPES,
+                index=constants.VALID_MIN_INTENSITY_TYPES.index(qp.min_intensity_type),
+            )
+
+            min_intensity = c2.number_input(
+                label='Min Intensity',
+                value=qp.min_intensity,
+                min_value=0.0,
+                max_value=1e9,
+                help=constants.MIN_INTENSITY_HELP
+            )
+
+            c1, c2 = st.columns(2)
+            top_n = c1.number_input(
+                label='Top N',
+                value=qp.top_n,
+                min_value=0,
+                help=constants.TOP_N_HELP
+            )
+
+            bottom_n = c2.number_input(
+                label='Bottom N',
+                value=qp.bottom_n,
+                min_value=0,
+                help=constants.BOTTOM_N_HELP
+            )
+
+            compression_algorithm = st.selectbox(
+                label='Compression Algorithm',
+                options=constants.VALID_COMPRESSION_ALGORITHMS,
+                index=constants.VALID_COMPRESSION_ALGORITHMS.index(qp.compression_algorithm),
+            )
+
+        with st.expander('AA Masses'):
+            aa_masses = eval(st.text_area(
+                label='AA Masses',
+                value=str(qp.aa_masses),
+            ))
+
+        debug = st.checkbox(
+            label='Debug',
+            value=False
+        )
     if spectra:
         mzs, ints = [], []
         for line in spectra.split('\n'):
@@ -409,7 +447,8 @@ qp_new = QueryParams(
     max_charge=max_charge,
     top_n=top_n,
     bottom_n=bottom_n,
-    immonium_ions=immonium_ions
+    immonium_ions=immonium_ions,
+    internal_fragment_types=internal_fragment_types,
 )
 
 if mass_tolerance_type == 'th' and mass_tolerance > 1:
@@ -426,7 +465,15 @@ for i in constants.IONS:
             ion_types.append(i)
             charges.append(c)
 
-
+# retrieve ion selections
+internal_ion_types = []
+internal_charges = []
+for i in constants.INTERNAL_IONS:
+    for c in range(min_charge, max_charge + 1):
+        label = get_ion_label(i, c)
+        if st.session_state.get(label, False):
+            internal_ion_types.append(i)
+            internal_charges.append(c)
 
 # Show Analysis URL with improved aesthetics
 url = generate_app_url(qp_new, qp.compression_algorithm, debug=debug)
@@ -441,39 +488,56 @@ st.markdown('---')
 
 # Show Sequence Info
 st.header(sequence)
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 
-c1.metric('Mass', round(calculate_mass(sequence, aa_masses=aa_masses), 4))
+c1.metric('Mass', round(pt.mass(sequence), 4))
 c2.metric('Length', len(unmodified_sequence))
 c3.metric('Peaks', len(spectra))
-
 
 cols = st.columns(max_charge - min_charge + 1)
 for i in range(min_charge, max_charge + 1):
     col = cols[i - min_charge]
-    col.metric(f'M/Z +{i}', round(calculate_mz(sequence, charge=i, aa_masses=aa_masses), 4))
+    col.metric(f'M/Z +{i}', round(pt.mz(sequence, charge=i), 4))
 
 
 @st.cache_data
-def build_fragments_cached(*args, **kwargs):
-    return build_fragments(*args, **kwargs)
+def build_fragments_cached(*args, **kwargs) -> List[pt.Fragment]:
+    return pt.fragment(*args, **kwargs)
 
 
-fragments = []
-for ion, charge in zip(ion_types, charges):
-    fragments.extend(build_fragments_cached(sequence=sequence,
-                                            ion_types=ion,
-                                            charges=charge,
+annotation = pt.parse(sequence)
+fragmenter = pt.Fragmenter(annotation, mass_type == 'monoisotopic')
+
+fragments = build_fragments_cached(sequence=annotation,
+                                   ion_types=['a', 'b', 'c', 'x', 'y', 'z'],
+                                   charges=list(range(min_charge, max_charge + 1)),
+                                   monoisotopic=(mass_type == 'monoisotopic'),
+                                   isotopes=list(range(isotopes + 1)),
+                                   losses=losses)
+
+ion_labels = {(ion_type, charge) for ion_type, charge in zip(ion_types, charges)}
+fragments = [fragment for fragment in fragments if (fragment.ion_type, fragment.charge) in ion_labels]
+
+
+if internal_fragments:
+    for ion_type, charge in zip(internal_ion_types, internal_charges):
+        fragments.extend(fragmenter.fragment(
+                                                ion_types=ion_type,
+                                                charges=charge,
+                                                isotopes=list(range(isotopes + 1)),
+                                                losses=losses))
+
+if immonium_ions is True:
+    fragments.extend(build_fragments_cached(sequence=annotation,
+                                            ion_types='i',
+                                            charges=1,
                                             monoisotopic=(mass_type == 'monoisotopic'),
-                                            internal=internal_fragments,
-                                            isotopes=list(range(isotopes + 1)),
-                                            losses=losses,
-                                            aa_masses=aa_masses,
-                                            immonium=immonium_ions))
+                                            isotopes=0,
+                                            losses=0))
+c4.metric('Fragments', len(fragments))
 
 frag_df = pd.DataFrame([fragment.to_dict() for fragment in fragments])
-
-#frag_df, fragments = get_fragments(ion_types, charges, sequence, mass_type, internal_fragments, isotopes, losses, aa_masses)
+# frag_df, fragments = get_fragments(ion_types, charges, sequence, mass_type, internal_fragments, isotopes, losses, aa_masses)
 
 if spectra:
 
@@ -492,7 +556,8 @@ if spectra:
     top_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1], reverse=True)[:top_n]
     bottom_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1])[:bottom_n]
 
-    # Combine ensuring no duplicates - since it's a list of tuples, we can use a dictionary to remove duplicates efficiently
+    # Combine ensuring no duplicates - since it's a list of tuples, we can use a dictionary to remove duplicates
+    # efficiently
     spectra_dict = {mz: intensity for mz, intensity in top_n_spectra + bottom_n_spectra}
     spectra = list(spectra_dict.items())
     mzs, ints = zip(*spectra)
@@ -500,117 +565,45 @@ if spectra:
     max_spectra_mz = max(mzs)
 
     # TODO: Add priority to fragment matches, a random isotope match should not be better than a non-isotope match
-    fragment_matches = compute_fragment_matches(fragments, mzs, ints, mass_tolerance, mass_tolerance_type)
+    fragment_matches = pt.get_fragment_matches(fragments, mzs, ints, mass_tolerance, mass_tolerance_type,
+                                               'largest' if peak_assignment == 'most intense' else 'closest')
     fragment_matches.sort(key=lambda x: abs(x.error), reverse=True)
-    fragment_matches = {fm.mz: fm for fm in fragment_matches}  # keep the best error for each fragment
 
-    match_data = {'sequence': [], 'charge': [], 'ion_type': [], 'number': [], 'internal': [], 'parent_number': [],
-                  'monoisotopic': [], 'mz': [], 'intensity': [], 'error': [], 'abs_error': [], 'theo_mz': [],
-                  'label': [], 'isotope': [], 'loss': [], 'error_ppm': [], 'abs_error_ppm': [], 'fragment_mz': [],
-                  'start': [], 'end': []}
-    data = {'sequence': [], 'charge': [], 'ion_type': [], 'number': [], 'internal': [], 'parent_number': [],
-            'monoisotopic': [], 'mz': [], 'intensity': [], 'error': [], 'abs_error': [], 'theo_mz': [],
-            'label': [], 'isotope': [], 'loss': [], 'error_ppm': [], 'abs_error_ppm': [], 'fragment_mz': [],
-            'start': [], 'end': []}
+    if filter_missing_mono:
+        fragment_matches = pt.filter_missing_mono_isotope(fragment_matches)
 
+    if filter_interrupted_iso:
+        fragment_matches = pt.filter_skipped_isotopes(fragment_matches)
+
+    match_cov = pt.get_match_coverage(fragment_matches)
+
+    if len(fragment_matches) == 0:
+        st.warning('No matches found, try increasing the mass tolerance or changing the ion types and charges')
+        st.stop()
+
+    fragment_matches = {fm.mz: fm for fm in fragment_matches}  # keep the best fragment match for each mz
+
+    match_data = []
+    data = []
     for mz, i in zip(mzs, ints):
         fm = fragment_matches.get(mz, None)
-
         if fm:
-            match_data['sequence'].append(fm.fragment.sequence)
-            match_data['charge'].append(fm.fragment.charge)
-            match_data['ion_type'].append(fm.fragment.ion_type)
-            match_data['number'].append(fm.fragment.number)
-            match_data['internal'].append(fm.fragment.internal)
-            match_data['parent_number'].append(fm.fragment.parent_number)
-            match_data['monoisotopic'].append(fm.fragment.monoisotopic)
-            match_data['mz'].append(mz)
-            match_data['intensity'].append(i)
-            match_data['error'].append(fm.error)
-            match_data['abs_error'].append(abs(fm.error))
-            match_data['error_ppm'].append(fm.error_ppm)
-            match_data['abs_error_ppm'].append(abs(fm.error_ppm))
-            match_data['theo_mz'].append(fm.fragment.mz)
-            match_data['label'].append(fm.fragment.label)
-            match_data['isotope'].append(fm.fragment.isotope)
-            match_data['loss'].append(fm.fragment.loss)
-            match_data['fragment_mz'].append(fm.fragment.mz)
-            match_data['start'].append(fm.fragment.start)
-            match_data['end'].append(fm.fragment.end)
-
-        data['sequence'].append('')
-        data['charge'].append(0)
-        data['ion_type'].append('')
-        data['number'].append(0)
-        data['internal'].append(False)
-        data['parent_number'].append(0)
-        data['monoisotopic'].append(True)
-        data['mz'].append(mz)
-        data['intensity'].append(i)
-        data['error'].append(0)
-        data['abs_error'].append(0)
-        data['error_ppm'].append(0)
-        data['abs_error_ppm'].append(0)
-        data['theo_mz'].append(0)
-        data['label'].append('')
-        data['isotope'].append(0)
-        data['loss'].append(0.0)
-        data['fragment_mz'].append(0.0)
-        data['start'].append(0)
-        data['end'].append(0)
+            match_data.append(fm.to_dict())
+        else:
+            fm = pt.FragmentMatch(fragment=None, mz=mz, intensity=i)
+            data.append(fm.to_dict())
 
     spectra_df = pd.DataFrame(data)
     spectra_df['matched'] = False
+    spectra_df['abs_error'] = spectra_df['error'].abs()
+    spectra_df['abs_error_ppm'] = spectra_df['error_ppm'].abs()
+
     match_df = pd.DataFrame(match_data)
     match_df['matched'] = True
+    match_df['abs_error'] = match_df['error'].abs()
+    match_df['abs_error_ppm'] = match_df['error_ppm'].abs()
 
-    # for keep only the lowest abs_error for ion_type, charge, num
-    if peak_assignment == 'most intense':
-        match_df.sort_values(by='intensity', inplace=True, ascending=False)
-        match_df.drop_duplicates(subset=['theo_mz'], inplace=True)
-
-    else:
-        match_df.sort_values(by='abs_error', inplace=True)
-        match_df.drop_duplicates(subset=['theo_mz'], inplace=True)
-
-    if filter_missing_mono:
-        # remove peaks that skip isotopes
-        mono_labels = set(match_df[match_df['isotope'] == 0]['label'].unique())
-        labels_to_remove = set()
-        for label in match_df[match_df['isotope'] != 0]['label'].unique():
-            mono_label = label.replace('*', '')
-            if mono_label not in mono_labels:
-                labels_to_remove.add(label)
-
-        match_df = match_df[~match_df['label'].isin(labels_to_remove)]
-
-    if filter_interrupted_iso:
-        # remove peaks any peaks after a missing isotope
-        labels_to_remove = set()
-
-        # get min isotope label for each mono label
-        labels = set(match_df['label'].unique())
-        mono_iso_labels = set([label.replace('*', '') for label in labels])
-        min_iso_labels = set()
-        for mono_label in mono_iso_labels:
-            for i in range(0, isotopes + 1):
-                label = mono_label + '*' * i
-                if label in labels:
-                    min_iso_labels.add(label)
-                    break
-
-        for min_label in min_iso_labels:
-            break_flag = False
-            iso_cnt = min_label.count('*')
-            for i in range(iso_cnt, isotopes + 1):
-                label = min_label + '*' * i
-                if label not in labels:
-                    break_flag = True
-                if break_flag:
-                    labels_to_remove.add(label)
-        match_df = match_df[~match_df['label'].isin(labels_to_remove)]
-
-    spectra_df = spectra_df[~spectra_df['mz'].isin(match_df['mz'])]
+    # spectra_df = spectra_df[~spectra_df['mz'].isin(match_df['mz'])]
     spectra_df = pd.concat([spectra_df, match_df])
 
     if hide_unassigned_peaks:
@@ -628,10 +621,12 @@ if spectra:
 
             if row['internal']:
                 color_label = get_ion_label(row['ion_type'], int(row['charge']))
-                ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}i"
+                # ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}i"
+                ion_label = row['label']
             else:
                 color_label = get_ion_label(row['ion_type'], int(row['charge']))
-                ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}"
+                # ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}"
+                ion_label = row['label']
 
         else:
             color_label = 'unassigned'
@@ -655,18 +650,18 @@ if spectra:
 
     cmap = mpl.colormaps.get_cmap('Blues')
 
+    # Create a color map for the intensities
     st.caption('Sequence coverage')
     for ion, charge in zip(ion_types, charges):
         cov_arr = [0] * len(unmodified_sequence)
         tmp_df = spectra_df[(spectra_df['ion_type'] == ion) & (spectra_df['charge'] == charge)]
-        nums = tmp_df['parent_number'].unique()
 
         if ion in 'abc':
-            for num in nums:
+            for num in tmp_df['end'].unique():
                 cov_arr[num - 1] = 1
         elif ion in 'xyz':
-            for num in nums:
-                cov_arr[len(unmodified_sequence) - (num - 1) - 1] = 1
+            for num in tmp_df['start'].unique():
+                cov_arr[num] = 1
         else:
             continue
 
@@ -696,17 +691,19 @@ if spectra:
                        mime="image/svg+xml")
 
     dfs = []
-    combined_data = {'AA': list(unmodified_sequence)}
+    # combined_data = {'AA': list(unmodified_sequence)}
+    combined_data = {'AA': pt.split(sequence)}
     for ion, charge in zip(ion_types, charges):
-        data = {'AA': list(unmodified_sequence)}
+        data = {'AA': pt.split(sequence)}
         ion_df = frag_df.copy()
         ion_df = ion_df[
             (ion_df['ion_type'] == ion) & (ion_df['charge'] == charge) &
             (ion_df['internal'] == False)]
-        ion_df.sort_values(by=['number'], inplace=True)
+        ion_df.sort_values(by=['start'] if ion in 'xyz' else ['end'], inplace=True,
+                           ascending=False if ion in 'xyz' else True)
 
         # keep only a single number
-        ion_df.drop_duplicates(subset=['number'], inplace=True)
+        ion_df.drop_duplicates(subset=['start'] if ion in 'xyz' else ['end'], inplace=True)
 
         frags = ion_df['mz'].tolist()
 

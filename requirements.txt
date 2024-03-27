@@ -1,6 +1,6 @@
 pandas==2.1.3
-peptacular==1.3.0
-streamlit==1.30.0
+peptacular @ git+https://github.com/pgarrett-scripps/peptacular@main
+streamlit==1.32.2
 matplotlib==3.8.2
 numpy==1.26.2
 plotly==5.18.0

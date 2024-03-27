@@ -16,9 +16,10 @@ def get_env_str(var_name, default):
 VALID_MASS_TYPES = {'monoisotopic', 'average'}
 DEFAULT_MASS_TYPE = 'monoisotopic'
 
-DEFAULT_SEQUENCE = '[164.0700]FDSFGDLSSASAIM(16)GNPK'
+DEFAULT_SEQUENCE = '[164.0700]-FDSFGDLSSASAIM[16]GNPK'
 
 DEFAULT_FRAGMENT_TYPES = {'+b', '+y'}
+DEFAULT_INTERNAL_FRAGMENT_TYPES = {}
 
 DEFAULT_MASS_TOLERANCE_TYPE = 'ppm'
 DEFAULT_MASS_TOLERANCE = 50
@@ -64,7 +65,8 @@ VALID_MIN_INTENSITY_TYPES = ['absolute', 'relative']
 DEFAULT_MIN_INTENSITY_TYPE = 'absolute'
 DEFAULT_MIN_CHARGE = 1
 DEFAULT_MAX_CHARGE = 3
-IONS = 'abcxyz'
+IONS = ['a', 'b', 'c', 'x', 'y', 'z']
+INTERNAL_IONS = ['ax', 'ay', 'az', 'bx', 'by', 'bz', 'cx', 'cy', 'cz']
 BASE_URL = get_env_str('BASE_URL', 'https://spectrum-viewer.streamlit.app/')
 COMP_API = get_env_str('COMP_API', 'http://127.0.0.1:8000')
 

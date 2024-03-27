@@ -1,8 +1,7 @@
 import urllib
 
-import peptacular.constants
 import requests
-from peptacular.mass import valid_mass_sequence
+import peptacular as pt
 
 import constants
 
@@ -47,6 +46,7 @@ class QueryParams:
     top_n: int
     bottom_n: int
     immonium_ions: bool
+    internal_fragment_types: Set[str]
 
 
 class InvalidQueryParam(Exception):
@@ -54,11 +54,13 @@ class InvalidQueryParam(Exception):
 
 
 def serialize_fragments(fragments) -> str:
-    return ';'.join([f'{f.count("+")}{f[-1]}' for f in fragments])
+    return ';'.join([f'{f.count("+")}{f[f.count("+"):]}' for f in fragments])
 
 
 def deserialize_fragments(s) -> set:
-    return set('+' * int(f[0]) + f[1] for f in s.split(';'))
+    if not s:
+        return set()
+    return set('+' * int(f[0]) + f[1:] for f in s.split(';'))
 
 
 def serialize_spectra(spectra: List[Tuple[float, float]], compression_algorithm: str) -> str:
@@ -130,7 +132,10 @@ def deserialize_aa_masses(s: str) -> Dict[str, float]:
 def parse_query_params(params) -> QueryParams:
     # Validate Peptide Sequence
     query_peptide_sequence = params.get('sequence', constants.DEFAULT_SEQUENCE)
-    if valid_mass_sequence(query_peptide_sequence) is False:
+
+    try:
+        pt.mass(query_peptide_sequence)
+    except Exception:
         raise InvalidQueryParam("Invalid peptide sequence.")
 
     # Mass Type Validation
@@ -143,9 +148,19 @@ def parse_query_params(params) -> QueryParams:
     try:
         query_fragment_types = deserialize_fragments(query_fragment_types)
     except ValueError:
-        raise InvalidQueryParam("Invalid fragment types format.")
+        raise InvalidQueryParam(f"Invalid fragment types format: '{query_fragment_types}'.")
     if not query_fragment_types.issubset(constants.COLOR_DICT.keys()):
-        InvalidQueryParam(f"Invalid fragment types: {query_fragment_types}")
+        InvalidQueryParam(f'Invalid fragment types: "{query_fragment_types}".')
+
+
+    # Fragment Types Validation
+    query_internal_fragment_types = params.get('internal_fragment_types', serialize_fragments(constants.DEFAULT_INTERNAL_FRAGMENT_TYPES))
+    try:
+        query_internal_fragment_types = deserialize_fragments(query_internal_fragment_types)
+    except ValueError:
+        raise InvalidQueryParam(f'Invalid internal fragment types format: "{query_internal_fragment_types}".')
+    if not query_internal_fragment_types.issubset(constants.COLOR_DICT.keys()):
+        InvalidQueryParam(f'Invalid internal fragment types: "{query_fragment_types}".')
 
     # Mass Tolerance Type Validation
     query_mass_tolerance_type = params.get('mass_tolerance_type', constants.DEFAULT_MASS_TOLERANCE_TYPE)
@@ -308,9 +323,9 @@ def parse_query_params(params) -> QueryParams:
             InvalidQueryParam(f"Invalid mass for amino acid {aa}: {mass}")
 
     if query_mass_type == 'average':
-        query_aa_masses = {**peptacular.constants.AVERAGE_AA_MASSES, **query_aa_masses}
+        query_aa_masses = {**pt.AVERAGE_AA_MASSES, **query_aa_masses}
     else:
-        query_aa_masses = {**peptacular.constants.MONO_ISOTOPIC_AA_MASSES, **query_aa_masses}
+        query_aa_masses = {**pt.MONOISOTOPIC_AA_MASSES, **query_aa_masses}
 
     # validate min/max charge
     query_min_charge = params.get('min_charge', str(constants.DEFAULT_MIN_CHARGE))
@@ -359,7 +374,6 @@ def parse_query_params(params) -> QueryParams:
         InvalidQueryParam("Immonium ions must be a boolean value.")
     query_immonium_ions = query_immonium_ions == 'True'
 
-
     return QueryParams(
         sequence=query_peptide_sequence,
         mass_type=query_mass_type,
@@ -390,6 +404,7 @@ def parse_query_params(params) -> QueryParams:
         top_n=query_top_n_peaks,
         bottom_n=query_bottom_n_peaks,
         immonium_ions=query_immonium_ions,
+        internal_fragment_types=query_internal_fragment_types,
     )
 
 
@@ -399,7 +414,7 @@ def generate_app_url(qp: QueryParams, comp, debug) -> str:
     if debug:
         base_url = 'http://localhost:8501/'
 
-    default_aa_masses = peptacular.constants.AVERAGE_AA_MASSES if qp.mass_type == 'average' else peptacular.constants.MONO_ISOTOPIC_AA_MASSES
+    default_aa_masses = pt.AVERAGE_AA_MASSES if qp.mass_type == 'average' else pt.MONOISOTOPIC_AA_MASSES
     diff_aa_masses = {aa: mass for aa, mass in qp.aa_masses.items() if
                       aa not in default_aa_masses or default_aa_masses[aa] != mass}
 
@@ -462,7 +477,10 @@ def generate_app_url(qp: QueryParams, comp, debug) -> str:
         params['bottom_n'] = str(qp.bottom_n)
     if qp.immonium_ions != constants.DEFAULT_IMMONIUM_IONS:
         params['query_immonium_ions'] = qp.immonium_ions
+    if qp.internal_fragment_types != constants.DEFAULT_INTERNAL_FRAGMENT_TYPES:
+        params['internal_fragment_types'] = serialize_fragments(qp.internal_fragment_types)
 
+    print(serialize_fragments(qp.internal_fragment_types))
     """params = {'sequence': urllib.parse.quote(qp.sequence),
         'mass_type': qp.mass_type,
         'fragment_types': serialize_fragments(qp.fragment_types),
