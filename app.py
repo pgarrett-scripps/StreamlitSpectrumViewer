@@ -119,7 +119,7 @@ def get_ion_label(i: str, c: int) -> str:
 with st.sidebar:
     st.title('Spectra Viewer')
 
-    st.caption('A tool to visualize peptide fragmentation spectra. Ensure to click the "Apply" button to update the '
+    st.caption('A tool to visualize and annotate msms spectra. Ensure to click the "Apply" button to update the '
                 'visualization.')
 
     st.caption('Made with [Peptacular](https://pypi.org/project/peptacular/).')
@@ -365,14 +365,16 @@ with st.sidebar:
                 label='Top N',
                 value=qp.top_n,
                 min_value=0,
-                help=constants.TOP_N_HELP
+                help=constants.TOP_N_HELP,
+                disabled=True,
             )
 
             bottom_n = c2.number_input(
                 label='Bottom N',
                 value=qp.bottom_n,
                 min_value=0,
-                help=constants.BOTTOM_N_HELP
+                help=constants.BOTTOM_N_HELP,
+                disabled=True,
             )
 
             compression_algorithm = st.selectbox(
@@ -479,7 +481,7 @@ for i in constants.INTERNAL_IONS:
 url = generate_app_url(qp_new, qp.compression_algorithm, debug=debug)
 url_chars = len(url)
 # Use an emoji to make the link more noticeable
-st.subheader(f'[Share with your friends!]({url}) [🔗]({url})')
+st.write(f'[Sharable URL]({url})')
 
 # Add an emoji to signify information about URL length
 st.write(f'Url Length: {url_chars} characters, 📏 {round(url_chars / 1024, 2)} KB')
@@ -553,12 +555,13 @@ if spectra:
         ints = [float(peak.intensity) for peak in deconvoluted_peaks]
 
     # Take top n peaks and bottom n peaks
-    top_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1], reverse=True)[:top_n]
-    bottom_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1])[:bottom_n]
+    #top_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1], reverse=True)[:top_n]
+    #bottom_n_spectra = sorted(zip(mzs, ints), key=lambda x: x[1])[:bottom_n]
 
     # Combine ensuring no duplicates - since it's a list of tuples, we can use a dictionary to remove duplicates
     # efficiently
-    spectra_dict = {mz: intensity for mz, intensity in top_n_spectra + bottom_n_spectra}
+    #spectra_dict = {mz: intensity for mz, intensity in top_n_spectra + bottom_n_spectra}
+    spectra_dict = {mz: intensity for mz, intensity in zip(mzs, ints)}
     spectra = list(spectra_dict.items())
     mzs, ints = zip(*spectra)
 
