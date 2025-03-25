@@ -4,7 +4,7 @@ import tempfile
 from typing import List
 
 import pandas as pd
-import streamlit as st
+import streamlit_permalink as st
 import peptacular as pt
 
 import matplotlib as mpl
@@ -117,7 +117,7 @@ def get_ion_label(i: str, c: int) -> str:
 
 
 with st.sidebar:
-    st.title('Spectra Viewer')
+    st.title('Spectra Viewer :eyeglasses:')
 
     st.caption('A tool to visualize and annotate msms spectra. Ensure to click the "Apply" button to update the '
                 'visualization.')
@@ -181,7 +181,7 @@ with st.sidebar:
         c1, c2 = st.columns(2)
 
         c1.subheader('Options Form')
-        c2.form_submit_button(label='Apply', use_container_width=True)
+        c2.form_submit_button(label='Apply', use_container_width=True, type='primary')
 
         st.write('Terminal Ions')
         fragment_types = set()
@@ -206,7 +206,6 @@ with st.sidebar:
             value=qp.immonium_ions,
             help=constants.IMMONIUM_IONS_HELP)
 
-
         internal_fragment_types = set()
         with st.expander('Internal Ions'):
             st.write('Internal Ions')
@@ -227,10 +226,9 @@ with st.sidebar:
 
         internal_fragments = len(internal_fragment_types) > 0
 
-
         st.caption('Neutral Losses')
         cols = st.columns(len(constants.NEUTRAL_LOSSES))
-        losses = [0.0]
+        losses = []
         neutral_losses = []
         for i, (nl, mass) in enumerate(constants.NEUTRAL_LOSSES.items()):
             l = cols[i].checkbox(
@@ -244,12 +242,12 @@ with st.sidebar:
 
         custom_losses = st.text_input(
             label='Custom Losses',
-            value=';'.join([str(l) for l in qp.custom_losses]),
+            value=';'.join([f'{nl[0]}:{nl[1]}' for nl in qp.custom_losses]),
             help=constants.CUSTOM_LOSSES_HELP
         )
 
         if custom_losses:
-            custom_losses = [float(x) for x in custom_losses.split(';')]
+            custom_losses = [(nl.split(':')[0], float(nl.split(':')[1])) for nl in custom_losses.split(';')]
             losses.extend(custom_losses)
 
         c1, c2 = st.columns(2)
@@ -265,7 +263,6 @@ with st.sidebar:
             options=['largest', 'closest'],
             index=0 if qp.peak_assignment == 'largest' else 1,
             help=constants.PEAK_ASSIGNMENT_HELP)
-
 
         with st.expander('Isotopes'):
 
@@ -383,12 +380,6 @@ with st.sidebar:
                 index=constants.VALID_COMPRESSION_ALGORITHMS.index(qp.compression_algorithm),
             )
 
-        with st.expander('AA Masses'):
-            aa_masses = eval(st.text_area(
-                label='AA Masses',
-                value=str(qp.aa_masses),
-            ))
-
         debug = st.checkbox(
             label='Debug',
             value=False
@@ -442,7 +433,6 @@ qp_new = QueryParams(
     filter_interrupted_iso=filter_interrupted_iso,
     min_mz=min_mz,
     max_mz=max_mz,
-    aa_masses=aa_masses,
     compression_algorithm=compression_algorithm,
     min_intensity_type=min_intensity_type,
     min_charge=min_charge,
@@ -512,11 +502,11 @@ annotation = pt.parse(sequence)
 fragmenter = pt.Fragmenter(annotation, mass_type == 'monoisotopic')
 
 fragments = build_fragments_cached(sequence=annotation,
-                                   ion_types=['a', 'b', 'c', 'x', 'y', 'z'],
-                                   charges=list(range(min_charge, max_charge + 1)),
-                                   monoisotopic=(mass_type == 'monoisotopic'),
-                                   isotopes=list(range(isotopes + 1)),
-                                   losses=losses)
+                       ion_types=['a', 'b', 'c', 'x', 'y', 'z'],
+                       charges=list(range(min_charge, max_charge + 1)),
+                       monoisotopic=(mass_type == 'monoisotopic'),
+                       isotopes=list(range(isotopes + 1)),
+                       losses=losses)
 
 ion_labels = {(ion_type, charge) for ion_type, charge in zip(ion_types, charges)}
 fragments = [fragment for fragment in fragments if (fragment.ion_type, fragment.charge) in ion_labels]
@@ -531,16 +521,14 @@ if internal_fragments:
                                                 losses=losses))
 
 if immonium_ions is True:
-    fragments.extend(build_fragments_cached(sequence=annotation,
-                                            ion_types='i',
-                                            charges=1,
-                                            monoisotopic=(mass_type == 'monoisotopic'),
-                                            isotopes=0,
-                                            losses=0))
+    fragments.extend(fragmenter.fragment(
+                                                ion_types=['i'],
+                                                charges=[1],
+                                                isotopes=list(range(isotopes + 1)),
+                                                losses=losses))
 c4.metric('Fragments', len(fragments))
 
 frag_df = pd.DataFrame([fragment.to_dict() for fragment in fragments])
-# frag_df, fragments = get_fragments(ion_types, charges, sequence, mass_type, internal_fragments, isotopes, losses, aa_masses)
 
 if spectra:
 
@@ -615,7 +603,6 @@ if spectra:
 
     spectra_df['ion_color_type'] = spectra_df['ion_type']
     spectra_df.loc[spectra_df['internal'], 'ion_color_type'] = 'i'
-
 
     def create_labels(row):
         if row['ion_type'] != '':
@@ -702,7 +689,8 @@ if spectra:
         ion_df = frag_df.copy()
         ion_df = ion_df[
             (ion_df['ion_type'] == ion) & (ion_df['charge'] == charge) &
-            (ion_df['internal'] == False)]
+            (ion_df['internal'] == False) & (ion_df['isotope'] == 0) & (ion_df['loss'] == 0)
+            ]
         ion_df.sort_values(by=['start'] if ion in 'xyz' else ['end'], inplace=True,
                            ascending=False if ion in 'xyz' else True)
 

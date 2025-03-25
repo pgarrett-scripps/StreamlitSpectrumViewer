@@ -32,13 +32,12 @@ class QueryParams:
     peak_picker_min_intensity: float
     peak_picker_mass_tolerance: float
     neutral_losses: List[str]
-    custom_losses: List[float]
+    custom_losses: List[Tuple[str, float]]
     isotopes: int
     filter_missing_mono: bool
     filter_interrupted_iso: bool
     min_mz: float
     max_mz: float
-    aa_masses: Dict[str, float]
     compression_algorithm: str
     min_intensity_type: str
     min_charge: int
@@ -111,22 +110,6 @@ def deserialize_spectra(s: str, compression_algorithm: str) -> List[Tuple[float,
             raise Exception("Failed to retrieve spectra from the server")
     else:
         raise ValueError(f'Invalid compression algorithm: {compression_algorithm}')
-
-
-def serialize_aa_masses(aa_masses: Dict[str, float]) -> str:
-    # {'X':" 25.0, 'Y': 30.0} -> "X25.0;Y30.0"
-    return ';'.join([f'{aa}{mass}' for aa, mass in aa_masses.items()])
-
-
-def deserialize_aa_masses(s: str) -> Dict[str, float]:
-    # "X25.0;Y30.0" -> {'X':" 25.0, 'Y': 30.0}
-    aa_masses = {}
-    for aa_mass in s.split(';'):
-        if aa_mass == '':
-            continue
-        aa, mass = aa_mass[0], float(aa_mass[1:])
-        aa_masses[aa] = mass
-    return aa_masses
 
 
 def parse_query_params(params) -> QueryParams:
@@ -259,7 +242,7 @@ def parse_query_params(params) -> QueryParams:
         query_custom_losses = []
     else:
         try:
-            query_custom_losses = [float(nl) for nl in query_custom_losses.split(';') if nl]
+            query_custom_losses = [(nl.split(':')[0], float(nl.split(':')[1])) for nl in query_custom_losses.split(';') if nl]
         except ValueError:
             InvalidQueryParam("Custom losses must be numbers.")
         if query_custom_losses:
@@ -306,26 +289,6 @@ def parse_query_params(params) -> QueryParams:
     except ValueError:
         InvalidQueryParam("Maximum m/z must be a number.")
 
-    query_aa_masses = deserialize_aa_masses(params.get('aa_masses', serialize_aa_masses({})))
-    try:
-        query_aa_masses = query_aa_masses
-        if not isinstance(query_aa_masses, dict):
-            raise ValueError
-    except ValueError:
-        InvalidQueryParam("Masses must be a dictionary of amino acid masses.")
-    for aa, mass in query_aa_masses.items():
-        try:
-            mass = float(mass)
-            if mass <= 0:
-                raise ValueError
-            query_aa_masses[aa] = mass
-        except ValueError:
-            InvalidQueryParam(f"Invalid mass for amino acid {aa}: {mass}")
-
-    if query_mass_type == 'average':
-        query_aa_masses = {**pt.AVERAGE_AA_MASSES, **query_aa_masses}
-    else:
-        query_aa_masses = {**pt.MONOISOTOPIC_AA_MASSES, **query_aa_masses}
 
     # validate min/max charge
     query_min_charge = params.get('min_charge', str(constants.DEFAULT_MIN_CHARGE))
@@ -396,7 +359,6 @@ def parse_query_params(params) -> QueryParams:
         filter_interrupted_iso=query_filter_interrupted_iso,
         min_mz=query_min_mz,
         max_mz=query_max_mz,
-        aa_masses=query_aa_masses,
         compression_algorithm=query_compression_algorithm,
         min_charge=query_min_charge,
         max_charge=query_max_charge,
@@ -414,97 +376,35 @@ def generate_app_url(qp: QueryParams, comp, debug) -> str:
     if debug:
         base_url = 'http://localhost:8501/'
 
-    default_aa_masses = pt.AVERAGE_AA_MASSES if qp.mass_type == 'average' else pt.MONOISOTOPIC_AA_MASSES
-    diff_aa_masses = {aa: mass for aa, mass in qp.aa_masses.items() if
-                      aa not in default_aa_masses or default_aa_masses[aa] != mass}
-
     params = {}
-    if qp.sequence != constants.DEFAULT_SEQUENCE:
-        params['sequence'] = urllib.parse.quote(qp.sequence)
-    if qp.mass_type != constants.DEFAULT_MASS_TYPE:
-        params['mass_type'] = qp.mass_type
-    if qp.fragment_types != constants.DEFAULT_FRAGMENT_TYPES:
-        params['fragment_types'] = serialize_fragments(qp.fragment_types)
-    if qp.mass_tolerance_type != constants.DEFAULT_MASS_TOLERANCE_TYPE:
-        params['mass_tolerance_type'] = str(qp.mass_tolerance_type)
-    if qp.mass_tolerance != constants.DEFAULT_MASS_TOLERANCE:
-        params['mass_tolerance'] = str(qp.mass_tolerance)
-    if qp.peak_assignment != constants.DEFAULT_PEAK_ASSIGNMENT:
-        params['peak_assignment'] = str(qp.peak_assignment)
-    if qp.internal_fragments != constants.DEFAULT_INTERNAL_FRAGMENTS:
-        params['internal_fragments'] = qp.internal_fragments
-    if qp.min_intensity != constants.DEFAULT_MIN_INTENSITY:
-        params['min_intensity'] = str(qp.min_intensity)
-    if qp.y_axis_scale != constants.DEFAULT_YAXIS_SCALE:
-        params['y_axis_scale'] = str(qp.y_axis_scale)
-    if qp.hide_unassigned_peaks != constants.DEFAULT_HIDE_UNASSIGNED_PEAKS:
-        params['hide_unassigned_peaks'] = qp.hide_unassigned_peaks
-    if qp.peak_picker != constants.DEFAULT_PEAK_PICKER:
-        params['peak_picker'] = qp.peak_picker
-    if qp.peak_picker_min_intensity != constants.DEFAULT_PEAK_PICKER_MIN_INTENSITY:
-        params['peak_picker_min_intensity'] = str(qp.peak_picker_min_intensity)
-    if qp.peak_picker_mass_tolerance != constants.DEFAULT_PEAK_PICKER_MASS_TOLERANCE:
-        params['peak_picker_mass_tolerance'] = str(qp.peak_picker_mass_tolerance)
-    if qp.neutral_losses:
-        params['neutral_losses'] = ';'.join(qp.neutral_losses)
-    if qp.custom_losses:
-        params['custom_losses'] = ';'.join(str(nl) for nl in qp.custom_losses)
-    if qp.isotopes != constants.DEFAULT_ISOTOPES:
-        params['isotopes'] = qp.isotopes
-    if qp.filter_missing_mono != constants.DEFAULT_FILTER_MISSING_MONO:
-        params['filter_missing_mono'] = qp.filter_missing_mono
-    if qp.filter_interrupted_iso != constants.DEFAULT_FILTER_INTERRUPTED_ISO:
-        params['filter_interrupted_iso'] = qp.filter_interrupted_iso
-    if qp.min_mz != constants.DEFAULT_MIN_MZ:
-        params['min_mz'] = str(qp.min_mz)
-    if qp.max_mz != constants.DEFAULT_MAX_MZ:
-        params['max_mz'] = str(qp.max_mz)
-    if qp.min_charge != constants.DEFAULT_MIN_CHARGE:
-        params['min_charge'] = str(qp.min_charge)
-    if qp.max_charge != constants.DEFAULT_MAX_CHARGE:
-        params['max_charge'] = str(qp.max_charge)
-    if qp.min_intensity_type != constants.DEFAULT_MIN_INTENSITY_TYPE:
-        params['min_intensity_type'] = qp.min_intensity_type
-    if diff_aa_masses:
-        params['aa_masses'] = serialize_aa_masses(diff_aa_masses)
-    if qp.compression_algorithm != constants.DEFAULT_COMPRESSION_ALGORITHM:
-        params['compression_algorithm'] = qp.compression_algorithm
-    if qp.spectra != deserialize_spectra(serialize_spectra(constants.DEFAULT_SPECTRA, comp), comp):
-        params['spectra'] = serialize_spectra(qp.spectra, qp.compression_algorithm)
-    if qp.top_n != constants.DEFAULT_TOP_N_PEAKS:
-        params['top_n'] = str(qp.top_n)
-    if qp.bottom_n != constants.DEFAULT_BOTTOM_N_PEAKS:
-        params['bottom_n'] = str(qp.bottom_n)
-    if qp.immonium_ions != constants.DEFAULT_IMMONIUM_IONS:
-        params['query_immonium_ions'] = qp.immonium_ions
-    if qp.internal_fragment_types != constants.DEFAULT_INTERNAL_FRAGMENT_TYPES:
-        params['internal_fragment_types'] = serialize_fragments(qp.internal_fragment_types)
-
-    print(serialize_fragments(qp.internal_fragment_types))
-    """params = {'sequence': urllib.parse.quote(qp.sequence),
-        'mass_type': qp.mass_type,
-        'fragment_types': serialize_fragments(qp.fragment_types),
-        'mass_tolerance_type': str(qp.mass_tolerance_type),
-        'mass_tolerance': str(qp.mass_tolerance),
-        'peak_assignment': str(qp.peak_assignment),
-        'internal_fragments': qp.internal_fragments,
-        'min_intensity': str(qp.min_intensity),
-        'y_axis_scale': str(qp.y_axis_scale),
-        'neutral_losses': ';'.join(qp.neutral_losses),
-        'custom_losses': ';'.join(str(nl) for nl in qp.custom_losses),
-        'hide_unassigned_peaks': qp.hide_unassigned_peaks,
-        'peak_picker': qp.peak_picker,
-        'peak_picker_min_intensity': str(qp.peak_picker_min_intensity),
-        'peak_picker_mass_tolerance': str(qp.peak_picker_mass_tolerance),
-        'isotopes': str(qp.isotopes),
-        'filter_missing_mono': str(qp.filter_missing_mono),
-        'filter_interrupted_iso': str(qp.filter_interrupted_iso),
-        'min_mz': str(qp.min_mz),
-        'max_mz': str(qp.max_mz),
-        'aa_masses': serialize_aa_masses(diff_aa_masses),
-        'compression_algorithm': qp.compression_algorithm,
-        'spectra': serialize_spectra(qp.spectra, qp.compression_algorithm),
-    }"""
-
+    params['sequence'] = urllib.parse.quote(qp.sequence)
+    params['mass_type'] = qp.mass_type
+    params['fragment_types'] = serialize_fragments(qp.fragment_types)
+    params['mass_tolerance_type'] = str(qp.mass_tolerance_type)
+    params['mass_tolerance'] = str(qp.mass_tolerance)
+    params['peak_assignment'] = str(qp.peak_assignment)
+    params['internal_fragments'] = qp.internal_fragments
+    params['min_intensity'] = str(qp.min_intensity)
+    params['y_axis_scale'] = str(qp.y_axis_scale)
+    params['hide_unassigned_peaks'] = qp.hide_unassigned_peaks
+    params['peak_picker'] = qp.peak_picker
+    params['peak_picker_min_intensity'] = str(qp.peak_picker_min_intensity)
+    params['peak_picker_mass_tolerance'] = str(qp.peak_picker_mass_tolerance)
+    params['neutral_losses'] = ';'.join(qp.neutral_losses)
+    params['custom_losses'] = ';'.join(f'{nl[0]}:{nl[1]}' for nl in qp.custom_losses)
+    params['isotopes'] = qp.isotopes
+    params['filter_missing_mono'] = qp.filter_missing_mono
+    params['filter_interrupted_iso'] = qp.filter_interrupted_iso
+    params['min_mz'] = str(qp.min_mz)
+    params['max_mz'] = str(qp.max_mz)
+    params['min_charge'] = str(qp.min_charge)
+    params['max_charge'] = str(qp.max_charge)
+    params['min_intensity_type'] = qp.min_intensity_type
+    params['compression_algorithm'] = qp.compression_algorithm
+    params['spectra'] = serialize_spectra(qp.spectra, qp.compression_algorithm)
+    params['top_n'] = str(qp.top_n)
+    params['bottom_n'] = str(qp.bottom_n)
+    params['query_immonium_ions'] = qp.immonium_ions
+    params['internal_fragment_types'] = serialize_fragments(qp.internal_fragment_types)
     query_string = '&'.join([f'{key}={value}' for key, value in params.items() if value is not None])
     return f'{base_url}?{query_string}'
