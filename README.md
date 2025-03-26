@@ -1,5 +1,29 @@
-1) Download TamperMonkey Chrome extension: https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo
-2) Open https://gist.github.com/pgarrett-scripps/d63b5fe06671a24e21f3a53fa8169070
-3) Click "Raw" button
-4) Click "Install" button
-5) A new link should appear at the bottom of any ip2 spectrum viewer page
+# SpecView 💣
+
+Made using [peptacular](https://github.com/pgarrett-scripps/peptacular):
+[![DOI](https://zenodo.org/badge/591504879.svg)](https://doi.org/10.5281/zenodo.15054278)
+
+
+SpecView is a web application for visualizing and annotating peptide mass spectra. It supports ProForma 2.0 compliant
+peptide sequences and provides comprehensive fragment ion analysis.
+## Installation
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/pgarrett-scripps/StreamlitSpectrumViewer
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Run the Streamlit application:
+```bash
+streamlit run app.py
+```
+
+## References
+
+TODO: add DOI
