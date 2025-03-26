@@ -163,6 +163,22 @@ with top_window:
             unsafe_allow_html=True,
         )
 
+        if page_loc and 'origin' in page_loc:
+            url_origin = page_loc['origin']
+
+            if button_c.button("Generate TinyURL", key="generate_tinyurl", type="primary"):
+                url_params = {k: st.query_params.get_all(k) for k in st.query_params.keys()}
+                page_url = f"{url_origin}{get_query_params_url(url_params)}"
+                short_url = shorten_url(page_url)
+
+
+                @st.dialog(title="Share your results")
+                def url_dialog(url):
+                    st.write(f"Shortened URL: {url}")
+
+
+                url_dialog(short_url)
+
     st.divider()
 
     # Show Sequence Info
@@ -189,8 +205,10 @@ with top_window:
         def run_spectra(spectra_fig, params):
             # slider to zoom from min to max mz
             min_mz, max_mz = params.min_spectra_mz, params.max_spectra_mz
-            mz_range = stp.slider("Zoom M/Z Range", min_value=min_mz, max_value=max_mz, value=(min_mz, max_mz),
-                                  key="plot_mz_range", stateful=params.stateful)
+            mz_range = st.slider("Zoom M/Z Range", min_value=min_mz, max_value=max_mz, value=(min_mz, max_mz),
+                                 key="plot_mz_range")
+
+
 
             # update the spectra_df with the new mz range
             # update fid to be from 100-200 mz
@@ -275,19 +293,3 @@ with top_window:
             on_click="ignore",
             key="download_spectra_data",
         )
-
-    if page_loc and 'origin' in page_loc:
-        url_origin = page_loc['origin']
-
-        if params.stateful and button_c.button("Generate TinyURL", key="generate_tinyurl", type="primary"):
-            url_params = {k: st.query_params.get_all(k) for k in st.query_params.keys()}
-            page_url = f"{url_origin}{get_query_params_url(url_params)}"
-            short_url = shorten_url(page_url)
-
-
-            @st.dialog(title="Share your results")
-            def url_dialog(url):
-                st.write(f"Shortened URL: {url}")
-
-
-            url_dialog(short_url)

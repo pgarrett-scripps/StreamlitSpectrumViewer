@@ -216,6 +216,10 @@ def get_ion_label(i: str, c: int) -> str:
 
 def parse_sequence(input_str: str) -> List[Tuple[float, float]]:
     """Parse sequence string into list of mz and intensity tuples."""
+
+    if not input_str:
+        return []
+
     mz_values, intensity_values = [], []
     lines = input_str.split("\n")
     for line in lines:
@@ -225,9 +229,9 @@ def parse_sequence(input_str: str) -> List[Tuple[float, float]]:
                 mz_values.append(float(parts[0]))
                 intensity_values.append(float(parts[1]))
             except ValueError:
-                raise ValueError("Invalid input format")
+                raise ValueError(f"Invalid input line: {parts}")
         else:
-            raise ValueError("Invalid input format")
+            raise ValueError(f"Invalid input format: {input_str}")
     return list(zip(mz_values, intensity_values))
 
 
@@ -247,7 +251,7 @@ def compress_spectra(input_str: str) -> str:
         return value
     except ValueError as e:
         st.error(f"Error compressing spectra: {e}")
-        raise e
+        return SpectrumCompressorUrl.compress([], [])
 
 
 @st.cache_data
@@ -267,9 +271,8 @@ def decompress_spectra(input_str: str) -> str:
         spectra = list(zip(mzs, ints))
         return serialize_sequence(spectra)
     except ValueError as e:
-        st.error(input_str)
         st.error(f"Error decompressing spectra: {e}")
-        raise e
+        raise ValueError(f"Error decompressing spectra: {e}") from e
 
 
 def filter_spectra(spectra, min_intensity, min_intensity_type, min_mz, max_mz):
