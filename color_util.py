@@ -57,7 +57,10 @@ def get_color_for_state(ion, charge, min_charge, max_charge, format_type='hex'):
     }
 
     def get_pos(c):
-        return (c - min_charge) / (max_charge - min_charge)
+        try:
+            return (c - min_charge) / (max_charge - min_charge)
+        except ZeroDivisionError:
+            return 0
 
     color_map_lamdas = {
         'ax': lambda x: get_pos(x) * 0.4,

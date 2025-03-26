@@ -7,3 +7,6 @@ plotly==5.18.0
 ms_deisotope==0.0.53
 msms-compression==0.3.0
 kaleido
+streamlit-permalink @ git+https://github.com/pgarrett-scripps/streamlit-permalink
+streamlit-js-eval==0.1.7
+requests==2.32.3

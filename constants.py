@@ -13,16 +13,24 @@ def get_env_str(var_name, default):
     return os.getenv(var_name, default)
 
 
-VALID_MASS_TYPES = {'monoisotopic', 'average'}
+
+VALID_MASS_TYPES = ['monoisotopic', 'average']
 DEFAULT_MASS_TYPE = 'monoisotopic'
 
 DEFAULT_SEQUENCE = '[164.0700]-FDSFGDLSSASAIM[16]GNPK'
 
-DEFAULT_FRAGMENT_TYPES = {'+b', '+y'}
+FRAGMENT_TYPES = ['a', 'b', 'c', 'x', 'y', 'z']
+DEFAULT_FRAGMENT_TYPES = ['b', 'y']
 DEFAULT_INTERNAL_FRAGMENT_TYPES = {}
 
+MASS_TOLERANCE_TYPES = ['ppm', 'th']
 DEFAULT_MASS_TOLERANCE_TYPE = 'ppm'
-DEFAULT_MASS_TOLERANCE = 50
+DEFAULT_PPM_MASS_TOLERANCE = 50.0
+DEFAULT_TH_MASS_TOLERANCE = 0.1
+MAX_PPM_MASS_TOLERANCE = 1000.0
+MAX_TH_MASS_TOLERANCE = 0.5
+
+PEAK_ASSIGNMENTS = ['largest', 'closest']
 DEFAULT_PEAK_ASSIGNMENT = 'largest'
 
 DEFAULT_INTERNAL_FRAGMENTS = False
@@ -40,6 +48,7 @@ DEFAULT_MAX_MZ = 10_000.0
 DEFAULT_BOTTOM_N_PEAKS = 0
 DEFAULT_TOP_N_PEAKS = 1_000_000
 DEFAULT_IMMONIUM_IONS = True
+MAX_CHARGE_STATES = 10
 
 COLOR_DICT = {'+i': 'mediumvioletred', '++i': 'palevioletred', '+++i': 'hotpink', '++++i': 'hotpink',
               '+++++i': 'hotpink',
@@ -55,7 +64,7 @@ VALID_MASS_TOLERANCE_TYPES = {'ppm', 'Da'}
 VALID_PEAK_ASSIGNMENTS = {'largest', 'closest'}  # Add more valid options as needed
 VALID_Y_AXIS_SCALES = {'linear', 'log'}  # Add more valid scales as needed
 MIN_CHARGE = get_env_int('MIN_CHARGE', 1)
-MAX_CHARGE = get_env_int('MAX_CHARGE', 5)
+MAX_CHARGE = get_env_int('MAX_CHARGE', 10)
 NEUTRAL_LOSSES = {'H2O': ('[STED]', -18.01056), 'NH3': ('[RKNQ]', -17.02655), 'H3PO4': ('[ST]', -97.9769)}
 DEFAULT_COMPRESSION_ALGORITHM = 'brotli'
 DEFAULT_NEUTRAL_LOSSES = []
@@ -264,6 +273,9 @@ DEFAULT_SPECTRA = [(283.751526, 6.493506), (287.601379, 11.096813), (295.031097,
                    (1804.001221, 26.200655), (1810.885376, 3.268579), (1812.401245, 3.987965), (1813.833862, 5.700371),
                    (1823.732666, 11.294738), (1829.043701, 8.69756), (1842.471436, 10.691337), (1858.751587, 2.804528),
                    (1870.911499, 1.789929), (1875.026001, 10.04264), (1875.768311, 1.793097), (1895.849243, 7.419658)]
+
+
+#print(";".join([f"{mz}:{intensity}" for mz, intensity in DEFAULT_SPECTRA]))
 
 SEQUENCE_HELP = "Enter the amino acid sequence of the peptide. Use standard one-letter amino acid codes."
 
