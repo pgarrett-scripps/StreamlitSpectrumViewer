@@ -4,6 +4,8 @@ import pandas as pd
 from app_input import SpectraInputs
 from plot_util import coverage_string
 import streamlit as st
+from urllib.parse import quote_plus
+import requests
 
 def get_ion_label_superscript(i: str, c: int) -> str:
     return i + to_superscript(f"+{c}")
@@ -379,3 +381,48 @@ def get_fragment_match_table(params: SpectraInputs, spectra_df: pd.DataFrame, fr
     )
 
     return combined_df
+
+
+def get_query_params_url(params_dict):
+    """
+    Create url params from alist of parameters and a dictionary with values.
+
+    Args:
+        params_list (str) :
+            A list of parameters to get the value of from `params_dict`
+        parmas_dict (dict) :
+            A dict with values for the `parmas_list .
+        **kwargs :
+            Extra keyword args to add to the url
+    """
+    return "?" + "&".join(
+        [
+            f"{key}={quote_plus(str(value))}"
+            for key, values in params_dict.items()
+            for value in listify(values)
+        ]
+    )
+
+
+def listify(o=None):
+    if o is None:
+        res = []
+    elif isinstance(o, list):
+        res = o
+    elif isinstance(o, str):
+        res = [o]
+    else:
+        res = [o]
+    return res
+
+
+def shorten_url(url: str) -> str:
+    """Shorten a URL using TinyURL."""
+    api_url = f"http://tinyurl.com/api-create.php?url={url}"
+
+    try:
+        response = requests.get(api_url)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        return f"Error: {e}"

@@ -302,6 +302,18 @@ def filter_spectra(spectra, min_intensity, min_intensity_type, min_mz, max_mz):
 def get_all_inputs(stateful: bool) -> SpectraInputs:
     """Get all inputs from the Streamlit UI and return as a SpectraInputs dataclass."""
 
+    # Inject custom CSS to set the width of the sidebar
+    st.markdown(
+        """
+        <style>
+            section[data-testid="stSidebar"] {
+                width: 600px !important; # Set the width to your desired value
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     input_tab, frag_tab, iso_tab, loss_tab, deconv_tab, plot_tab = st.tabs(
         ["Input", "Fragment", "Isotope", "Loss", "Deconv", "Plot"])
 

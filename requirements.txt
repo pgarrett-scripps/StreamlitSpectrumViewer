@@ -1,13 +1,14 @@
 pandas==2.1.3
-peptacular @ git+https://github.com/pgarrett-scripps/peptacular@main
-streamlit==1.32.2
+peptacular==2.2.1
+streamlit==1.44.0
 matplotlib==3.8.2
 numpy==1.26.2
 plotly==5.18.0
-ms_deisotope==0.0.53
 msms-compression==0.3.0
 kaleido
-streamlit-permalink @ git+https://github.com/pgarrett-scripps/streamlit-permalink
+streamlit-permalink @ git+https://github.com/pgarrett-scripps/streamlit-permalink@0156072
 streamlit-js-eval==0.1.7
 requests==2.32.3
-msdecon @ https://github.com/pgarrett-scripps/MsDecon
+msdecon @ git+https://github.com/pgarrett-scripps/MsDecon@cba7a7f
+streamlit-js-eval==0.1.7
+requests==2.32.3
