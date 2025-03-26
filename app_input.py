@@ -1,4 +1,4 @@
-from functools import cache, lru_cache
+from functools import cache, lru_cache, cached_property
 
 import streamlit as st
 import streamlit_permalink as stp
@@ -9,7 +9,7 @@ from typing import List, Tuple, Dict, Any, Optional
 import constants
 from color_util import get_color_dict
 from msms_compression import SpectrumCompressorUrl
-
+from msdecon.deconvolution import deconvolute
 
 @dataclass
 class SpectraInputs:
@@ -53,6 +53,11 @@ class SpectraInputs:
     h3po4_loss: bool
     custom_loss_str: str
 
+    #deconvolution parameters
+    deconvolute: bool
+    deconvolute_error_type: str
+    deconvolute_error: float
+
     stateful: bool = True
 
     @property
@@ -92,17 +97,70 @@ class SpectraInputs:
             for c in range(self.min_charge, self.max_charge + 1)
         ]
 
-    @property
+    @cached_property
     def spectra(self) -> list[tuple[float, float]]:
-        return parse_sequence(self.spectra_text)
+
+        spectra = parse_sequence(self.spectra_text)
+
+        # filter
+        if self.min_intensity_type == "relative":
+            max_intensity = max([intensity for _, intensity in spectra])
+            spectra = [
+                (mz, intensity)
+                for mz, intensity in spectra
+                if intensity >= self.min_intensity / 100 * max_intensity
+            ]
+
+        if self.min_intensity_type == "absolute":
+            spectra = [
+                (mz, intensity)
+                for mz, intensity in spectra
+                if intensity >= self.min_intensity
+            ]
+
+        if self.min_mz:
+            spectra = [
+                (mz, intensity)
+                for mz, intensity in spectra
+                if mz >= self.min_mz
+            ]
+
+        if self.max_mz:
+            spectra = [
+                (mz, intensity)
+                for mz, intensity in spectra
+                if mz <= self.max_mz
+            ]
+
+        if self.deconvolute:
+            peaks = deconvolute(spectra,
+                                  tolerance=self.deconvolute_error,
+                                  tolerance_type=self.deconvolute_error_type,
+                                  charge_range=(self.min_charge, self.max_charge))
+
+            spectra = [(p.base_peak.mz, p.total_intensity) for p in peaks]
+
+        return spectra
+
+    @cached_property
+    def min_spectra_mz(self):
+        return min([mz for mz, _ in self.spectra])
+
+    @cached_property
+    def max_spectra_mz(self):
+        return max([mz for mz, _ in self.spectra])
     
-    @property
+    @cached_property
     def mz_values(self) -> list[float]:
         return [mz for mz, _ in self.spectra]
     
-    @property
+    @cached_property
     def intensity_values(self) -> list[float]:
         return [intensity for _, intensity in self.spectra]
+
+    @cached_property
+    def mz_int_values(self) -> (list[float], list[float]):
+        return self.mz_values, self.intensity_values
     
     @property
     def filtered_spectra(self) -> list[tuple[float, float]]:
@@ -124,14 +182,7 @@ class SpectraInputs:
     @property
     def color_dict(self) -> dict[str, str]:
         return get_color_dict(self.min_charge, self.max_charge)
-    
-    @property
-    def ion_types(self) -> list[str]:
-        return [
-            f"{f}{c}"
-            for f in self.fragment_types
-            for c in range(self.min_charge, self.max_charge + 1)
-        ]
+
     
     @property
     def charges(self) -> list[int]:
@@ -152,6 +203,10 @@ class SpectraInputs:
     @property
     def isotopes(self) -> list[int]:
         return list(range(self.num_isotopes + 1))
+
+    @property
+    def peak_assignment_type(self) -> str:
+        return "largest" if self.peak_assignment == "most intense" else "closest"
 
 
 def get_ion_label(i: str, c: int) -> str:
@@ -247,119 +302,121 @@ def filter_spectra(spectra, min_intensity, min_intensity_type, min_mz, max_mz):
 def get_all_inputs(stateful: bool) -> SpectraInputs:
     """Get all inputs from the Streamlit UI and return as a SpectraInputs dataclass."""
 
-    # Sequence input
-    sequence = stp.text_input(
-        label="Sequence (Proforma2.0 Notation)",
-        value=constants.DEFAULT_SEQUENCE,
-        help=constants.SEQUENCE_HELP,
-        key="peptide_sequence",
-        stateful=stateful,
-    )
+    input_tab, frag_tab, iso_tab, loss_tab, deconv_tab, plot_tab = st.tabs(
+        ["Input", "Fragment", "Isotope", "Loss", "Deconv", "Plot"])
 
-    # Mass tolerance settings
-    c1, c2 = st.columns(2)
-    with c1:
-        mass_tolerance_type = stp.selectbox(
-            label="Mass Tolerance Type",
-            options=constants.MASS_TOLERANCE_TYPES,
-            index=constants.MASS_TOLERANCE_TYPES.index(
-                constants.DEFAULT_MASS_TOLERANCE_TYPE
-            ),
-            help=constants.MASS_TOLERANCE_TYPE_HELP,
-            key="mass_tolerance_type",
+    with input_tab:
+        # Sequence input
+        sequence = stp.text_input(
+            label="Sequence (Proforma2.0 Notation)",
+            value=constants.DEFAULT_SEQUENCE,
+            help=constants.SEQUENCE_HELP,
+            key="peptide_sequence",
             stateful=stateful,
         )
 
-    with c2:
-        mass_tolerance = stp.number_input(
-            label="Mass Tolerance",
-            value=constants.DEFAULT_PPM_MASS_TOLERANCE,
-            help=constants.MASS_TOLERANCE_HELP,
-            key="mass_error",
+        spectra_text = stp.text_area(
+            label="Spectra (mz Intensity)",
+            value=serialize_sequence(constants.DEFAULT_SPECTRA),
+            help=constants.SPECTRA_HELP,
+            height=150,
+            key="spectra",
+            compress=True,
+            compressor=compress_spectra,
+            decompressor=decompress_spectra,
             stateful=stateful,
         )
 
-    spectra_text = stp.text_area(
-        label="Spectra (mz Intensity)",
-        value=serialize_sequence(constants.DEFAULT_SPECTRA),
-        help=constants.SPECTRA_HELP,
-        height=150,
-        key="spectra",
-        compress=True,
-        compressor=compress_spectra,
-        decompressor=decompress_spectra,
-        stateful=stateful,
-    )
+    with frag_tab:
 
-    # Charge range
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        min_charge = stp.number_input(
-            label="Min Charge",
-            min_value=0,
-            max_value=100,
-            value=1,
-            key="min_charge",
-            #on_change=on_min_change,
+        # Fragment ion selection
+        fragment_types = stp.pills(
+            "Fragment Ions",
+            selection_mode="multi",
+            options=constants.FRAGMENT_TYPES + ['immonium'],
+            default=constants.DEFAULT_FRAGMENT_TYPES,
+            help="Select fragment ion types to display",
+            key="fragment_types",
             stateful=stateful,
         )
 
-    with c2:
-        max_charge = stp.number_input(
-            label="Max Charge",
-            min_value=0,
-            max_value=100,
-            value=2,
-            key="max_charge",
-            #on_change=on_max_change,
-            stateful=stateful,
-        )
+        immonium_ions = 'immonium' in fragment_types
 
-    # Fragment ion selection
-    fragment_types = stp.pills(
-        "Fragment Ions",
-        selection_mode="multi",
-        options=constants.FRAGMENT_TYPES,
-        default=constants.DEFAULT_FRAGMENT_TYPES,
-        help="Select fragment ion types to display",
-        key="fragment_types",
-        stateful=stateful,
-    )
+        # drop immonium
+        fragment_types = [f for f in fragment_types if f != 'immonium']
 
-    # Immonium ions
-    immonium_ions = stp.checkbox(
-        label="Immonium Ions",
-        value=constants.DEFAULT_IMMONIUM_IONS,
-        help=constants.IMMONIUM_IONS_HELP,
-        key="immonium_ions",
-        stateful=stateful,
-    )
+        # Mass tolerance settings
+        c1, c2 = st.columns(2)
+        with c1:
+            mass_tolerance_type = stp.selectbox(
+                label="Mass Tolerance Type",
+                options=constants.MASS_TOLERANCE_TYPES,
+                index=constants.MASS_TOLERANCE_TYPES.index(
+                    constants.DEFAULT_MASS_TOLERANCE_TYPE
+                ),
+                help=constants.MASS_TOLERANCE_TYPE_HELP,
+                key="mass_tolerance_type",
+                stateful=stateful,
+            )
 
-    # Mass type and peak assignment
-    c1, c2 = st.columns(2)
-    with c1:
-        mass_type = stp.selectbox(
-            label="Mass Type",
-            options=constants.VALID_MASS_TYPES,
-            index=constants.VALID_MASS_TYPES.index(constants.DEFAULT_MASS_TYPE),
-            help=constants.MASS_TYPE_HELP,
-            key="mass_type",
-            stateful=stateful,
-        )
+        with c2:
+            mass_tolerance = stp.number_input(
+                label="Mass Tolerance",
+                value=constants.DEFAULT_PPM_MASS_TOLERANCE,
+                help=constants.MASS_TOLERANCE_HELP,
+                key="mass_error",
+                stateful=stateful,
+            )
 
-    with c2:
-        peak_assignment = stp.selectbox(
-            label="Peak Assignment",
-            options=constants.PEAK_ASSIGNMENTS,
-            index=constants.PEAK_ASSIGNMENTS.index(constants.DEFAULT_PEAK_ASSIGNMENT),
-            help=constants.PEAK_ASSIGNMENT_HELP,
-            key="peak_assignment",
-            stateful=stateful,
-        )
+        # Charge range
+        c1, c2 = st.columns(2)
+
+        with c1:
+            min_charge = stp.number_input(
+                label="Min Charge",
+                min_value=0,
+                max_value=100,
+                value=1,
+                key="min_charge",
+                #on_change=on_min_change,
+                stateful=stateful,
+            )
+
+        with c2:
+            max_charge = stp.number_input(
+                label="Max Charge",
+                min_value=0,
+                max_value=100,
+                value=2,
+                key="max_charge",
+                #on_change=on_max_change,
+                stateful=stateful,
+            )
+
+        # Mass type and peak assignment
+        c1, c2 = st.columns(2)
+        with c1:
+            mass_type = stp.selectbox(
+                label="Mass Type",
+                options=constants.VALID_MASS_TYPES,
+                index=constants.VALID_MASS_TYPES.index(constants.DEFAULT_MASS_TYPE),
+                help=constants.MASS_TYPE_HELP,
+                key="mass_type",
+                stateful=stateful,
+            )
+
+        with c2:
+            peak_assignment = stp.selectbox(
+                label="Peak Assignment",
+                options=constants.PEAK_ASSIGNMENTS,
+                index=constants.PEAK_ASSIGNMENTS.index(constants.DEFAULT_PEAK_ASSIGNMENT),
+                help=constants.PEAK_ASSIGNMENT_HELP,
+                key="peak_assignment",
+                stateful=stateful,
+            )
 
     # Isotope settings
-    with st.expander("Isotopes"):
+    with iso_tab:
         num_isotopes = stp.number_input(
             label="Isotopes",
             value=0,
@@ -389,7 +446,7 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
             )
 
     # Plot options
-    with st.expander("Plot Options"):
+    with plot_tab:
         c1, c2 = st.columns(2)
         with c1:
             y_axis_scale = stp.radio(
@@ -454,24 +511,20 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
             )
 
     # Neutral losses
-    with st.expander("Neutral Losses"):
+    with loss_tab:
 
-        # Water loss
-        h2o_loss = stp.checkbox(label='H2O', 
-                        value=False, 
-                        key='H2O', 
-                        stateful=stateful)
-        
 
-        nh3_loss = stp.checkbox(label='NH3', 
-                        value=False, 
-                        key='NH3', 
-                        stateful=stateful)
-        
-        h3po4_loss = stp.checkbox(label='H3PO4', 
-                        value=False, 
-                        key='H3PO4', 
-                        stateful=stateful)         
+        loss_pills = stp.pills('Neutral Losses',
+                            selection_mode='multi',
+                            options=['H2O', 'NH3', 'H3PO4'],
+                            default=[],
+                            help='Select neutral losses to display',
+                            key='losses',
+                            stateful=stateful)
+
+        h2o_loss = 'H2O' in loss_pills
+        nh3_loss = 'NH3' in loss_pills
+        h3po4_loss = 'H3PO4' in loss_pills
         
         # Handle custom losses
         custom_loss_str = stp.text_input(
@@ -482,8 +535,33 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
             key="custom_losses",
             stateful=stateful,
         )
-            
-    
+
+    # Deconvolution options
+    with deconv_tab:
+        deconvolute = stp.checkbox(label='Deconvolute',
+                        value=False,
+                        key='deconvolute',
+                        stateful=stateful)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            deconvolute_error_type = stp.selectbox(
+                label="Error Type",
+                options=['da', 'ppm'],
+                index=1,
+                key="deconvolute_error_type",
+                stateful=stateful,
+            )
+
+        with c2:
+            deconvolute_error = stp.number_input(
+                label="Error",
+                value=10.0,
+                key="deconvolute_error",
+                stateful=stateful,
+            )
+
+
     # Create and return the dataclass instance
     return SpectraInputs(
         sequence=sequence,
@@ -509,6 +587,9 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
         nh3_loss=nh3_loss,
         h3po4_loss=h3po4_loss,
         custom_loss_str=custom_loss_str,
+        deconvolute=deconvolute,
+        deconvolute_error_type=deconvolute_error_type,
+        deconvolute_error=deconvolute_error,
         stateful=stateful
     )
 

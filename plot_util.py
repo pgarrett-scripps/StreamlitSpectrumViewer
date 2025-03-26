@@ -24,13 +24,15 @@ def coverage_string(protein_cov_arr, stripped_protein_sequence, c='grey'):
 
     return protein_coverage
 
+
 def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
     unique_color_labels = df['color_label'].unique().tolist()
+
     def order(x):
         if x == 'unassigned':
             return 0
         elif x.endswith('i'):
-            return (ord('z')+1) * 50 + x.count('+')
+            return (ord('z') + 1) * 50 + x.count('+')
         else:
             return ord(x[-1]) * 50 + x.count('+')
 
@@ -62,7 +64,6 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
                                      legendrank=order(color_label),
                                      showlegend=True,
                                      opacity=0.66 if color_label == 'unassigned' else 1.0))
-
 
     fig_spectra.update_layout(title='Spectra Plot',
                               xaxis_title='M/Z',
@@ -123,9 +124,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
 
     fig_error.update_layout(title='Error Plot',
                             xaxis_title='M/Z',
-                            yaxis_title='Error (th)' if error_scale == 'th' else 'Error (ppm)',
-                            yaxis_type=scale)
-
+                            yaxis_title='Error (th)' if error_scale == 'th' else 'Error (ppm)')
     fig_error.update_traces(textposition='top center')
 
     # Combine plots into subplots
@@ -146,7 +145,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
     fig.update_layout(
         width=800,  # Width of the figure in pixels
         height=600,  # Height of the figure in pixels
-        title_text="Annotated Spectra"
+        title_text="Annotated Spectra",
     )
 
     # Add horizontal line for positive 95th percentile
@@ -409,7 +408,6 @@ def generate_fragment_plot_ion_type(unmodified_sequence, spectra_df):
                 showlegend=False  # Set to False for subsequent traces
             ), row=2, col=1)
 
-
     # Update layout and axis titles
     fig.update_layout(title='Fragment Analysis', showlegend=True, barmode='stack')
     fig.update_xaxes(range=[0, peptide_length], tickvals=list(amino_acid_labels.keys()),
@@ -425,8 +423,7 @@ def generate_fragment_plot_ion_type(unmodified_sequence, spectra_df):
 
     # Define the min and max for the x-axis
     x_min = -1  # minimum value for x-axis
-    x_max = peptide_length + 1 # maximum value for x-axis, assuming peptide_length is the length of your sequence
-
+    x_max = peptide_length + 1  # maximum value for x-axis, assuming peptide_length is the length of your sequence
 
     # Update x-axis for both subplots
     fig.update_xaxes(range=[x_min, x_max], row=1, col=1)

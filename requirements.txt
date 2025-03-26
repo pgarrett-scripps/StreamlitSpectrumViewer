@@ -10,3 +10,4 @@ kaleido
 streamlit-permalink @ git+https://github.com/pgarrett-scripps/streamlit-permalink
 streamlit-js-eval==0.1.7
 requests==2.32.3
+msdecon @ https://github.com/pgarrett-scripps/MsDecon
