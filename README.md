@@ -26,4 +26,5 @@ streamlit run app.py
 
 ## References
 
-TODO: add DOI
+If you use [Spec-Viewer](https://github.com/pgarrett-scripps/StreamlitSpectrumViewer) in a publication, 
+               please cite: [![DOI](https://zenodo.org/badge/728447115.svg)](https://doi.org/10.5281/zenodo.15092689)

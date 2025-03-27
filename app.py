@@ -54,16 +54,28 @@ st.set_page_config(page_title="Spectra Viewer", page_icon=":eyeglasses:", layout
 
 with st.sidebar:
 
-    c1, c2 = st.columns([3, 2], vertical_alignment="center")
-    c1.title("Spectra Viewer :eyeglasses:")
-    with c2:
-        stateful = stp.toggle("Stateful", True, key="stateful")
+    st.markdown(f"""
+            <div style='text-align: center; padding: 15px; top-margin: 0px'>
+                <h3 style='margin: 0; font-size: 1.5em; color: #333;'>Spec-Viewer 👓</h3>
+                <p style='font-size: 1.1em; line-height: 1.6; color: #555;'>
+                    Powered by 
+                    <a href="https://github.com/pgarrett-scripps/peptacular" target="_blank" style='color: #007BFF; text-decoration: none;'>
+                        <strong>Peptacular</strong>
+                    </a>. 
+                    See the 
+                    <a href="https://peptacular.readthedocs.io/en/latest/modules/getting_started.html#proforma-notation" 
+                    target="_blank" style='color: #007BFF; text-decoration: none;'>
+                        Proforma Notation Docs
+                    </a> for supported peptide syntax. To report any issues or suggest improvements, please visit the 
+                    <a href="https://github.com/pgarrett-scripps/StreamlitSpectrumViewer" 
+                    target="_blank" style='color: #007BFF; text-decoration: none;'>
+                        PepFrag Github Repo.
+                    </a>
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
 
-    st.caption(
-        'A tool to visualize and annotate msms spectra. Ensure to click the "Apply" button to update the '
-        "visualization."
-    )
-    st.caption("Made with [Peptacular](https://pypi.org/project/peptacular/).")
+    stateful = stp.toggle("Stateful", True, key="stateful")
 
     with stp.form("params"):
 
@@ -293,3 +305,31 @@ with top_window:
             on_click="ignore",
             key="download_spectra_data",
         )
+
+
+    st.divider()
+
+    st.markdown(f"""
+        <div style='display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-top: 0px solid #ddd;'>
+            <div style='text-align: left; font-size: 1.1em; color: #555;'>
+                <a href="https://github.com/pgarrett-scripps/pep-frag" target="_blank" 
+                   style='text-decoration: none; color: #007BFF; font-weight: bold;'>
+                    Spec-Viewer
+                </a>
+                <a href="https://doi.org/10.5281/zenodo.15092689" target="_blank" style="margin-left: 12px;">
+                    <img src="https://zenodo.org/badge/728447115.svg" alt="DOI" 
+                         style="vertical-align: middle; height: 20px;">
+                </a>
+            </div>
+            <div style='text-align: right; font-size: 1.1em; color: #555;'>
+                <a href="https://github.com/pgarrett-scripps/peptacular" target="_blank" 
+                   style='text-decoration: none; color: #007BFF; font-weight: bold;'>
+                    Peptacular
+                </a>
+                <a href="https://doi.org/10.5281/zenodo.15054278" target="_blank" style="margin-left: 12px;">
+                    <img src="https://zenodo.org/badge/591504879.svg" alt="DOI" 
+                         style="vertical-align: middle; height: 20px;">
+                </a>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
