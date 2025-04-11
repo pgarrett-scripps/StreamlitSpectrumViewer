@@ -4,8 +4,8 @@ import pandas as pd
 import streamlit_permalink as stp
 import streamlit as st
 import peptacular as pt
-
 import matplotlib as mpl
+from streamlit_js_eval import get_page_location
 
 from app_input import get_all_inputs
 import constants
@@ -16,7 +16,6 @@ from plot_util import (
 )
 from util import get_fragment_matches, get_match_cov, get_spectra_df, display_coverage_markdown, \
     get_fragment_match_table, get_query_params_url, shorten_url
-from streamlit_js_eval import get_page_location
 
 
 @st.cache_data
