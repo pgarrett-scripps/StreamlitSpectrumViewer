@@ -545,7 +545,7 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
             label="Marker Size",
             value=3.0,
             min_value=1.0,
-            max_value=30,
+            max_value=30.0,
             help=constants.MARKER_SIZE_HELP,
             key="marker_size",
             stateful=stateful,
@@ -553,9 +553,9 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         text_size = stp.number_input(
             label="Text Size",
-            value=12,
-            min_value=8,
-            max_value=30,
+            value=12.0,
+            min_value=8.0,
+            max_value=30.0,
             help=constants.TEXT_SIZE_HELP,
             key="text_size",
             stateful=stateful,
