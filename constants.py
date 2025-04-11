@@ -273,7 +273,6 @@ DEFAULT_SPECTRA = [(283.751526, 6.493506), (287.601379, 11.096813), (295.031097,
                    (1804.001221, 26.200655), (1810.885376, 3.268579), (1812.401245, 3.987965), (1813.833862, 5.700371),
                    (1823.732666, 11.294738), (1829.043701, 8.69756), (1842.471436, 10.691337), (1858.751587, 2.804528),
                    (1870.911499, 1.789929), (1875.026001, 10.04264), (1875.768311, 1.793097), (1895.849243, 7.419658)]
-DEFAULT_SPECTRA = DEFAULT_SPECTRA[:100]
 
 #print(";".join([f"{mz}:{intensity}" for mz, intensity in DEFAULT_SPECTRA]))
 
@@ -328,3 +327,5 @@ IMMONIUM_IONS_HELP = "Check this box to include immonium ions in the analysis."
 TEXT_SIZE_HELP = "Set the text size for labels in the graph."
 
 LINE_WIDTH_HELP = "Set the line width for the graph."
+
+MARKER_SIZE_HELP = "Set the marker size for peaks in the graph."

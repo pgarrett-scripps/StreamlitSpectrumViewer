@@ -48,6 +48,7 @@ class SpectraInputs:
     min_intensity: float
     line_width: float
     text_size: float
+    marker_size: float
     
     # Neutral loss parameters
     h2o_loss: bool
@@ -506,16 +507,6 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
                 stateful=stateful,
             )
 
-            line_width = stp.number_input(
-                label="Line Width",
-                value=0.25,
-                min_value=0.0,
-                max_value=5.0,
-                help=constants.LINE_WIDTH_HELP,
-                key="line_width",
-                stateful=stateful,
-            )
-
         with c2:
             max_mz = stp.number_input(
                 label="Max m/z",
@@ -537,15 +528,38 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
                 stateful=stateful,
             )
 
-            text_size = stp.number_input(
-                label="Text Size",
-                value=12,
-                min_value=8,
-                max_value=30,
-                help=constants.TEXT_SIZE_HELP,
-                key="text_size",
-                stateful=stateful,
-            )
+        st.caption("Text and Line Options")
+
+
+        line_width = stp.number_input(
+            label="Line Width",
+            value=0.25,
+            min_value=0.0,
+            max_value=5.0,
+            help=constants.LINE_WIDTH_HELP,
+            key="line_width",
+            stateful=stateful,
+        )
+
+        marker_size = stp.number_input(
+            label="Marker Size",
+            value=3.0,
+            min_value=1.0,
+            max_value=30,
+            help=constants.MARKER_SIZE_HELP,
+            key="marker_size",
+            stateful=stateful,
+        )
+
+        text_size = stp.number_input(
+            label="Text Size",
+            value=12,
+            min_value=8,
+            max_value=30,
+            help=constants.TEXT_SIZE_HELP,
+            key="text_size",
+            stateful=stateful,
+        )
 
     # Neutral losses
     with loss_tab:
@@ -630,5 +644,6 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
         stateful=stateful,
         text_size=text_size,
         line_width=line_width,
+        marker_size=marker_size,
     )
 

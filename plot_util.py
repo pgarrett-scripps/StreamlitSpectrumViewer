@@ -25,7 +25,7 @@ def coverage_string(protein_cov_arr, stripped_protein_sequence, c='grey'):
     return protein_coverage
 
 
-def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm', line_width=0.25, text_size=13):
+def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm', line_width=0.25, text_size=13, marker_size=5):
     unique_color_labels = df['color_label'].unique().tolist()
 
     def order(x):
@@ -91,7 +91,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm', lin
                                        mode='markers+text',
                                        marker=dict(
                                            color=tmp_df['color'],
-                                           size=line_width * 2  # Scale marker size based on line_width
+                                           size=marker_size  # Scale marker size based on line_width
                                        ),
                                        text=tmp_df['label'],
                                        hovertext=hover_texts,
