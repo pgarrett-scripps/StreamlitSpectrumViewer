@@ -1,10 +1,10 @@
-from functools import cache, lru_cache, cached_property
+from functools import cached_property
 
 import streamlit as st
 import streamlit_permalink as stp
 import peptacular as pt
-from dataclasses import dataclass, field, asdict
-from typing import List, Tuple, Dict, Any, Optional
+from dataclasses import dataclass
+from typing import List, Tuple
 
 import constants
 from color_util import get_color_dict
@@ -533,9 +533,10 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         line_width = stp.number_input(
             label="Line Width",
-            value=0.25,
+            value=0.5,
             min_value=0.0,
             max_value=5.0,
+            step=0.25,
             help=constants.LINE_WIDTH_HELP,
             key="line_width",
             stateful=stateful,
@@ -543,9 +544,10 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         marker_size = stp.number_input(
             label="Marker Size",
-            value=3.0,
+            value=6.0,
             min_value=1.0,
             max_value=30.0,
+            step=1.0,
             help=constants.MARKER_SIZE_HELP,
             key="marker_size",
             stateful=stateful,
@@ -553,9 +555,10 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         text_size = stp.number_input(
             label="Text Size",
-            value=12.0,
+            value=15.0,
             min_value=8.0,
             max_value=30.0,
+            step=1.0,
             help=constants.TEXT_SIZE_HELP,
             key="text_size",
             stateful=stateful,
@@ -563,7 +566,6 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
     # Neutral losses
     with loss_tab:
-
 
         loss_pills = stp.pills('Neutral Losses',
                             selection_mode='multi',

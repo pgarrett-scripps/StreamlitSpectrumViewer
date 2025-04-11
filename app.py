@@ -12,7 +12,7 @@ import constants
 from color_util import get_color_dict
 from plot_util import (
     generate_annonated_spectra_plotly,
-    generate_fragment_plot_ion_type, generate_error_histogram,
+    generate_fragment_plot_ion_type,
 )
 from util import get_fragment_matches, get_match_cov, get_spectra_df, display_coverage_markdown, \
     get_fragment_match_table, get_query_params_url, shorten_url
@@ -236,10 +236,36 @@ with top_window:
 
         run_spectra(spectra_fig, params)
 
+        with st.expander("Download Chart Options", expanded=False):
+            download_width = st.number_input(
+                "Download Chart Width (px)",
+                min_value=100,
+                max_value=5000,
+                value=1920,
+                step=100,
+                key="download_width",
+            )
+            download_height = st.number_input(
+                "Download Chart Height (px)",
+                min_value=100,
+                max_value=5000,
+                value=1080,
+                step=100,
+                key="download_height",
+            )
+            download_scale = st.number_input(
+                "Download Chart Scale",
+                min_value=1.0,
+                max_value=5.0,
+                value=3.0,
+                step=0.1,
+                key="download_scale",
+            )
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmpfile:
             # Save the figure to the temporary file
             spectra_fig.write_image(
-                file=tmpfile.name, format="svg", width=1920, height=1080, scale=3.0
+                file=tmpfile.name, format="svg", width=download_width, height=download_height, scale=download_scale
             )
 
             # Read the content of the temporary file
