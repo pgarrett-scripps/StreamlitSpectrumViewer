@@ -10,5 +10,3 @@ streamlit-permalink @ git+https://github.com/pgarrett-scripps/streamlit-permalin
 streamlit-js-eval==0.1.7
 requests==2.32.3
 msdecon @ git+https://github.com/pgarrett-scripps/MsDecon@cba7a7f
-streamlit-js-eval==0.1.7
-requests==2.32.3

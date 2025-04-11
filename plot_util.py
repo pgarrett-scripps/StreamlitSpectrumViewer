@@ -25,7 +25,7 @@ def coverage_string(protein_cov_arr, stripped_protein_sequence, c='grey'):
     return protein_coverage
 
 
-def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
+def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm', line_width=0.25, text_size=13):
     unique_color_labels = df['color_label'].unique().tolist()
 
     def order(x):
@@ -55,7 +55,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
         # Create the Spectra Plot
         fig_spectra.add_trace(go.Bar(x=tmp_df['mz'],
                                      y=tmp_df['intensity'],
-                                     width=0.25,
+                                     width=line_width,  # Scale width based on line_width parameter
                                      marker_color=tmp_df['color'],
                                      hovertext=hover_texts,
                                      hoverinfo='text',
@@ -89,10 +89,16 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
         fig_error.add_trace(go.Scatter(x=tmp_df['mz'],
                                        y=tmp_df['error'] if error_scale == 'th' else tmp_df['error_ppm'],
                                        mode='markers+text',
-                                       marker_color=tmp_df['color'],
+                                       marker=dict(
+                                           color=tmp_df['color'],
+                                           size=line_width * 2  # Scale marker size based on line_width
+                                       ),
                                        text=tmp_df['label'],
                                        hovertext=hover_texts,
-                                       textfont=dict(color=text_colors),
+                                       textfont=dict(
+                                           color=text_colors,
+                                           size=text_size  # Use textsize parameter
+                                       ),
                                        hoverinfo='text',
                                        legendgroup=color_label,
                                        legendrank=order(color_label),
@@ -226,7 +232,7 @@ def generate_annonated_spectra_plotly(df, scale='linear', error_scale='ppm'):
                 showarrow=False,
                 yshift=10,
                 font=dict(
-                    size=13,
+                    size=text_size,  # Use textsize parameter
                     color=row['color']
                 ),
                 row=2, col=1

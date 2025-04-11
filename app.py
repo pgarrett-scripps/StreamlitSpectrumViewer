@@ -156,7 +156,9 @@ match_df = spectra_df[spectra_df["matched"]]
 
 cmap = mpl.colormaps.get_cmap("Blues")
 spectra_fig = generate_annonated_spectra_plotly(spectra_df, scale=params.y_axis_scale,
-                                                error_scale=params.mass_tolerance_type)
+                                                error_scale=params.mass_tolerance_type,
+                                                line_width=params.line_width, 
+                                                text_size=params.text_size)
 combined_df = get_fragment_match_table(params, spectra_df, frag_df)
 
 top_window, bottom_window = st.container(), st.container()
