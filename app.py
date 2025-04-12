@@ -77,6 +77,7 @@ with st.sidebar:
     stateful = stp.toggle("Stateful", True, key="stateful")
 
     with stp.form("params"):
+        
 
         btn = stp.form_submit_button("Apply", use_container_width=True, type='primary')
 

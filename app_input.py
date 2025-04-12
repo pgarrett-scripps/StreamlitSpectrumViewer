@@ -530,7 +530,7 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         st.caption("Text and Line Options")
 
-        with st.form():
+        with st.form("plot_options_form"):
             line_width = stp.number_input(
                 label="Line Width",
                 value=0.5,
