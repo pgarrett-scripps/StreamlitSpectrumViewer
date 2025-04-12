@@ -77,7 +77,7 @@ with st.sidebar:
     stateful = stp.toggle("Stateful", True, key="stateful")
 
     with stp.form("params"):
-        
+
 
         btn = stp.form_submit_button("Apply", use_container_width=True, type='primary')
 
@@ -237,30 +237,34 @@ with top_window:
         run_spectra(spectra_fig, params)
 
         with st.expander("Download Chart Options", expanded=False):
-            download_width = st.number_input(
-                "Download Chart Width (px)",
-                min_value=100,
-                max_value=5000,
-                value=1920,
-                step=100,
-                key="download_width",
-            )
-            download_height = st.number_input(
-                "Download Chart Height (px)",
-                min_value=100,
-                max_value=5000,
-                value=1080,
-                step=100,
-                key="download_height",
-            )
-            download_scale = st.number_input(
-                "Download Chart Scale",
-                min_value=1.0,
-                max_value=5.0,
-                value=3.0,
-                step=0.1,
-                key="download_scale",
-            )
+
+            with st.form("download_options_form"):
+                download_width = st.number_input(
+                    "Download Chart Width (px)",
+                    min_value=100,
+                    max_value=5000,
+                    value=1920,
+                    step=100,
+                    key="download_width",
+                )
+                download_height = st.number_input(
+                    "Download Chart Height (px)",
+                    min_value=100,
+                    max_value=5000,
+                    value=1080,
+                    step=100,
+                    key="download_height",
+                )
+                download_scale = st.number_input(
+                    "Download Chart Scale",
+                    min_value=1.0,
+                    max_value=5.0,
+                    value=3.0,
+                    step=0.1,
+                    key="download_scale",
+                )
+
+                submitted = st.form_submit_button("Apply Options")
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmpfile:
             # Save the figure to the temporary file

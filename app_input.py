@@ -530,42 +530,38 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         st.caption("Text and Line Options")
 
-        with st.form("plot_options_form"):
-            line_width = stp.number_input(
-                label="Line Width",
-                value=0.5,
-                min_value=0.0,
-                max_value=5.0,
-                step=0.25,
-                help=constants.LINE_WIDTH_HELP,
-                key="line_width",
-                stateful=stateful,
-            )
+        line_width = stp.number_input(
+            label="Line Width",
+            value=0.5,
+            min_value=0.0,
+            max_value=5.0,
+            step=0.25,
+            help=constants.LINE_WIDTH_HELP,
+            key="line_width",
+            stateful=stateful,
+        )
 
-            marker_size = stp.number_input(
-                label="Marker Size",
-                value=6.0,
-                min_value=1.0,
-                max_value=30.0,
-                step=1.0,
-                help=constants.MARKER_SIZE_HELP,
-                key="marker_size",
-                stateful=stateful,
-            )
+        marker_size = stp.number_input(
+            label="Marker Size",
+            value=6.0,
+            min_value=1.0,
+            max_value=30.0,
+            step=1.0,
+            help=constants.MARKER_SIZE_HELP,
+            key="marker_size",
+            stateful=stateful,
+        )
 
-            text_size = stp.number_input(
-                label="Text Size",
-                value=15.0,
-                min_value=8.0,
-                max_value=30.0,
-                step=1.0,
-                help=constants.TEXT_SIZE_HELP,
-                key="text_size",
-                stateful=stateful,
-            )
-
-        with st.form_submit_button("Apply Plot Options"):
-            pass
+        text_size = stp.number_input(
+            label="Text Size",
+            value=15.0,
+            min_value=8.0,
+            max_value=30.0,
+            step=1.0,
+            help=constants.TEXT_SIZE_HELP,
+            key="text_size",
+            stateful=stateful,
+        )
 
     # Neutral losses
     with loss_tab:
