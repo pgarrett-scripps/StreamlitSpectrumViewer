@@ -97,6 +97,30 @@ def generate_annonated_spectra_plotly(df, scale='linear',
     for color_label in unique_color_labels:
         tmp_df = df[df['ion_group_label'] == color_label]
         format_group_label = tmp_df['format_group_label'].iloc[0]
+
+        
+        # First add all the bar lines
+        first = True
+        for i, row in tmp_df.iterrows():
+            fig_spectra.add_trace(go.Scatter(
+            x=[row['mz'], row['mz']],
+            y=[0, row['intensity']],
+            mode='lines',
+            line=dict(
+                width=line_width,
+                color=row['color']
+            ),
+            name=format_group_label,
+            legendgroup=color_label,
+            legendrank=order(color_label),
+            showlegend=first,
+            opacity=0.66 if color_label == 'unassigned' else .9
+            ))
+            first = False
+
+
+        tmp_df = df[df['ion_group_label'] == color_label]
+        format_group_label = tmp_df['format_group_label'].iloc[0]
         
         if color_label == 'unassigned':
             hover_texts = tmp_df.apply(lambda
@@ -111,25 +135,6 @@ def generate_annonated_spectra_plotly(df, scale='linear',
                                                 f"<br>loss: {row['loss']}<br>Fragment M/Z: {row['theo_mz']}",
                                     axis=1)
         
-        # First add all the bar lines
-        first = True
-        for i, row in tmp_df.iterrows():
-            fig_spectra.add_trace(go.Scattergl(
-            x=[row['mz'], row['mz']],
-            y=[0, row['intensity']],
-            mode='lines',
-            line=dict(
-                width=line_width,
-                color=row['color']
-            ),
-            name=format_group_label,
-            legendgroup=color_label,
-            legendrank=order(color_label),
-            showlegend=first,
-            opacity=0.66 if color_label == 'unassigned' else 1.0
-            ))
-            first = False
-
 
         fig_spectra.add_trace(go.Scatter(
             x=tmp_df['mz'],

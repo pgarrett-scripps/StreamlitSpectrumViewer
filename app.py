@@ -17,7 +17,6 @@ from plot_util import (
 )
 from util import get_fragment_matches, get_match_cov, get_spectra_df, display_coverage_markdown, \
     get_fragment_match_table, get_query_params_url, shorten_url
-from IPython.display import display, HTML
 
 
 @st.cache_data
@@ -52,10 +51,6 @@ def get_cached_fragments(annotation:pt.ProFormaAnnotation,
     return fragments
 
 st.set_page_config(page_title="Spectra Viewer", page_icon=":eyeglasses:", layout="wide")
-## Tomas Mazak's workaround
-with open("load_mathjax.js", "r") as f:
-    js = f.read()
-    st.components.v1.html(f"<script>{js}</script>", height=0)
 
 with st.sidebar:
 
