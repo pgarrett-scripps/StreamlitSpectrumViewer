@@ -56,6 +56,7 @@ class SpectraInputs:
     fig_height: float
     hide_error_percentile_labels: bool
     bold_labels: bool
+    color_dict: dict[str, str]
     
     # Neutral loss parameters
     h2o_loss: bool
@@ -69,10 +70,6 @@ class SpectraInputs:
     deconvolute_error: float
 
     stateful: bool = True
-
-    def __post_init__(self):
-        self.color_dict = get_color_dict(self.min_charge, self.max_charge)
-
     @property
     def custom_losses(self) -> dict[str, float]:
 
@@ -339,8 +336,8 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
         unsafe_allow_html=True,
     )
 
-    input_tab, frag_tab, iso_tab, loss_tab, deconv_tab, plot_tab = st.tabs(
-        ["Input", "Fragment", "Isotope", "Loss", "Deconv", "Plot"])
+    input_tab, frag_tab, iso_tab, loss_tab, deconv_tab, plot_tab, vis_tab = st.tabs(
+        ["Input", "Fragment", "Isotope", "Loss", "Deconv", "Spectra", "Plot"])
 
     with input_tab:
         # Sequence input
@@ -547,102 +544,123 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
                 stateful=stateful,
             )
 
-        st.caption("Text and Line Options")
+    with vis_tab:
 
-        line_width = stp.number_input(
-            label="Line Width",
-            value=2.0,
-            min_value=0.0,
-            max_value=5.0,
-            step=0.25,
-            help=constants.LINE_WIDTH_HELP,
-            key="line_width",
-            stateful=stateful,
-        )
+        c1, c2 = st.columns(2)
+        with c1:
+            line_width = stp.number_input(
+                label="Line Width",
+                value=2.0,
+                min_value=0.0,
+                max_value=5.0,
+                step=0.25,
+                help=constants.LINE_WIDTH_HELP,
+                key="line_width",
+                stateful=stateful,
+            )
 
-        marker_size = stp.number_input(
-            label="Marker Size",
-            value=6.0,
-            min_value=1.0,
-            max_value=30.0,
-            step=1.0,
-            help=constants.MARKER_SIZE_HELP,
-            key="marker_size",
-            stateful=stateful,
-        )
 
-        text_size = stp.number_input(
-            label="Text Size",
-            value=20.0,
-            min_value=8.0,
-            max_value=30.0,
-            step=1.0,
-            help=constants.TEXT_SIZE_HELP,
-            key="text_size",
-            stateful=stateful,
-        )
+            text_size = stp.number_input(
+                label="Text Size",
+                value=20.0,
+                min_value=8.0,
+                max_value=30.0,
+                step=1.0,
+                help=constants.TEXT_SIZE_HELP,
+                key="text_size",
+                stateful=stateful,
+            )
 
-        axis_text_size = stp.number_input(
-            label="Axis Text Size",
-            value=15.0,
-            min_value=8.0,
-            max_value=30.0,
-            step=1.0,
-            key="axis_text_size",
-            stateful=stateful,
-        )
-        title_text_size = stp.number_input(
-            label="Title Text Size",
-            value=20.0,
-            min_value=8.0,
-            max_value=30.0,
-            step=1.0,
-            key="title_text_size",
-            stateful=stateful,
-        )
+            tick_text_size = stp.number_input(
+                label="Tick Text Size",
+                value=15.0,
+                min_value=8.0,
+                max_value=30.0,
+                step=1.0,
+                key="tick_text_size",
+                stateful=stateful,
+            )
+            
+            fig_height = stp.number_input(
+                label="Figure Height",
+                value=600,
+                min_value=100,
+                max_value=5000,
+                step=100,
+                key="fig_height",
+                stateful=stateful,
+            )
 
-        tick_text_size = stp.number_input(
-            label="Tick Text Size",
-            value=15.0,
-            min_value=8.0,
-            max_value=30.0,
-            step=1.0,
-            key="tick_text_size",
-            stateful=stateful,
-        )
+            
+            bold_labels = stp.checkbox(
+                label="Bold Labels",
+                value=False,
+                key="bold_labels",
+                stateful=stateful,
+            )
+        with c2:
+            marker_size = stp.number_input(
+                label="Marker Size",
+                value=6.0,
+                min_value=1.0,
+                max_value=30.0,
+                step=1.0,
+                help=constants.MARKER_SIZE_HELP,
+                key="marker_size",
+                stateful=stateful,
+            )
 
-        fig_width = stp.number_input(
-            label="Figure Width",
-            value=800,
-            min_value=100,
-            max_value=5000,
-            step=100,
-            key="fig_width",
-            stateful=stateful,
-        )
-        fig_height = stp.number_input(
-            label="Figure Height",
-            value=600,
-            min_value=100,
-            max_value=5000,
-            step=100,
-            key="fig_height",
-            stateful=stateful,
-        )
+            axis_text_size = stp.number_input(
+                label="Axis Text Size",
+                value=15.0,
+                min_value=8.0,
+                max_value=30.0,
+                step=1.0,
+                key="axis_text_size",
+                stateful=stateful,
+            )
+            title_text_size = stp.number_input(
+                label="Title Text Size",
+                value=20.0,
+                min_value=8.0,
+                max_value=30.0,
+                step=1.0,
+                key="title_text_size",
+                stateful=stateful,
+            )
 
-        hide_error_percentile_labels = stp.checkbox(
-            label="Hide Error Percentile Labels",
-            value=False,
-            key="hide_error_percentile_labels",
-            stateful=stateful,
-        )
 
-        bold_labels = stp.checkbox(
-            label="Bold Labels",
-            value=False,
-            key="bold_labels",
-            stateful=stateful,
-        )
+            fig_width = stp.number_input(
+                label="Figure Width",
+                value=800,
+                min_value=100,
+                max_value=5000,
+                step=100,
+                key="fig_width",
+                stateful=stateful,
+            )
+
+
+            hide_error_percentile_labels = stp.checkbox(
+                label="Hide Error Percentile Labels",
+                value=False,
+                key="hide_error_percentile_labels",
+                stateful=stateful,
+            )
+
+        _default_color_dict = get_color_dict(min_charge, max_charge)
+
+        color_dict = {'unassigned': _default_color_dict['unassigned']}
+        for ion_type in fragment_types:
+            for charge in range(min_charge, max_charge + 1):
+                key = f"{'+'*charge}{ion_type}"
+                color_dict[key] = _default_color_dict[key]
+
+        with st.expander('Colors'):
+            cols = st.columns([1, 1, 1])
+            for i, key in enumerate(color_dict.keys()):
+                with cols[i % len(cols)]:
+                    color_dict[key] = stp.color_picker(f"{key}", value=color_dict[key])
 
 
     # Neutral losses
@@ -735,5 +753,6 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
         fig_height=fig_height,
         hide_error_percentile_labels=hide_error_percentile_labels,
         bold_labels=bold_labels,
+        color_dict=color_dict
     )
 

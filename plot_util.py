@@ -43,6 +43,10 @@ def generate_annonated_spectra_plotly(df, scale='linear',
     df = df.copy(deep=True)
 
     def format_label(row):
+
+        if row['custom_label'] != None:
+            return row['custom_label']
+
         if row['ion_group_label'] == 'unassigned':
             return ''
 
