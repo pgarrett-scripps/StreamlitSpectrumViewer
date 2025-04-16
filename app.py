@@ -242,10 +242,15 @@ with spectra_tab:
             )
 
             spectra_df["custom_label"] = None
+            spectra_df['peak'] = spectra_df['label']
+
+            #set None peaks to unassigned
+            spectra_df.loc[spectra_df['peak'].isna(), 'peak'] = 'unassigned'
+            spectra_df["custom_color"] = None
 
             spectra_df = st.data_editor(spectra_df, hide_index=True,
                                                 use_container_width=True,
-                                                column_order=["mz", "intensity", "label", "custom_label", "color"],
+                                                column_order=["mz", "intensity", "peak", "custom_label", "custom_color"],
                                                 column_config={
                                                     "mz": st.column_config.NumberColumn(
                                                         "M/Z",
@@ -261,10 +266,10 @@ with spectra_tab:
                                                         disabled=True,                                                    
                                                         width="small",
                                                     ),
-                                                    "label": st.column_config.CheckboxColumn(
-                                                        "Label",
-                                                        help="Label the peak",
-                                                        disabled=False,
+                                                    "label": st.column_config.TextColumn(
+                                                        "Peak",
+                                                        help="Peak",
+                                                        disabled=True,
                                                         width="small",
                                                     ),
                                                     "custom_label": st.column_config.TextColumn(
@@ -272,8 +277,8 @@ with spectra_tab:
                                                         help="Label of the peak",
                                                         width="large",
                                                     ),
-                                                    "color": st.column_config.TextColumn(
-                                                        "Color",
+                                                    "custom_color": st.column_config.TextColumn(
+                                                        "Custom Color",
                                                         help="Color of the peak",
                                                         width="large",
                                                     ),
@@ -283,6 +288,10 @@ with spectra_tab:
 
             form_submit = st.form_submit_button("Submit", type="primary", use_container_width=True)
             
+    # Update the color column only for rows with non-null and non-empty custom_color values
+    mask = (spectra_df['custom_color'].notna()) & (spectra_df['custom_color'] != "")
+    spectra_df.loc[mask, 'color'] = spectra_df.loc[mask, 'custom_color']
+    
 
     spectra_fig = generate_annonated_spectra_plotly(spectra_df, scale=params.y_axis_scale,
                                                     error_scale=params.mass_tolerance_type,
