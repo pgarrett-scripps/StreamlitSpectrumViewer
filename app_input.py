@@ -49,6 +49,13 @@ class SpectraInputs:
     line_width: float
     text_size: float
     marker_size: float
+    axis_text_size: float
+    title_text_size: float
+    tick_text_size: float
+    fig_width: float
+    fig_height: float
+    hide_error_percentile_labels: bool
+    bold_labels: bool
     
     # Neutral loss parameters
     h2o_loss: bool
@@ -62,6 +69,9 @@ class SpectraInputs:
     deconvolute_error: float
 
     stateful: bool = True
+
+    def __post_init__(self):
+        self.color_dict = get_color_dict(self.min_charge, self.max_charge)
 
     @property
     def custom_losses(self) -> dict[str, float]:
@@ -182,9 +192,18 @@ class SpectraInputs:
     def filtered_intensity_values(self) -> list[float]:
         return [intensity for _, intensity in self.filtered_spectra]
     
-    @property
-    def color_dict(self) -> dict[str, str]:
-        return get_color_dict(self.min_charge, self.max_charge)
+    
+    def get_color(self, ion: str, charge: int) -> str:
+        """Get color for a specific ion and charge."""
+
+        if ion is None or charge is None:
+            return self.color_dict['unassigned']
+
+        color_key = f'{"+" * charge}{ion}'
+        if color_key in self.color_dict:
+            return self.color_dict[color_key]
+        else:
+            return self.color_dict['unassigned']
 
     
     @property
@@ -532,7 +551,7 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         line_width = stp.number_input(
             label="Line Width",
-            value=0.5,
+            value=2.0,
             min_value=0.0,
             max_value=5.0,
             step=0.25,
@@ -554,7 +573,7 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
 
         text_size = stp.number_input(
             label="Text Size",
-            value=15.0,
+            value=20.0,
             min_value=8.0,
             max_value=30.0,
             step=1.0,
@@ -562,6 +581,69 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
             key="text_size",
             stateful=stateful,
         )
+
+        axis_text_size = stp.number_input(
+            label="Axis Text Size",
+            value=15.0,
+            min_value=8.0,
+            max_value=30.0,
+            step=1.0,
+            key="axis_text_size",
+            stateful=stateful,
+        )
+        title_text_size = stp.number_input(
+            label="Title Text Size",
+            value=20.0,
+            min_value=8.0,
+            max_value=30.0,
+            step=1.0,
+            key="title_text_size",
+            stateful=stateful,
+        )
+
+        tick_text_size = stp.number_input(
+            label="Tick Text Size",
+            value=15.0,
+            min_value=8.0,
+            max_value=30.0,
+            step=1.0,
+            key="tick_text_size",
+            stateful=stateful,
+        )
+
+        fig_width = stp.number_input(
+            label="Figure Width",
+            value=800,
+            min_value=100,
+            max_value=5000,
+            step=100,
+            key="fig_width",
+            stateful=stateful,
+        )
+        fig_height = stp.number_input(
+            label="Figure Height",
+            value=600,
+            min_value=100,
+            max_value=5000,
+            step=100,
+            key="fig_height",
+            stateful=stateful,
+        )
+
+        hide_error_percentile_labels = stp.checkbox(
+            label="Hide Error Percentile Labels",
+            value=False,
+            key="hide_error_percentile_labels",
+            stateful=stateful,
+        )
+
+        bold_labels = stp.checkbox(
+            label="Bold Labels",
+            value=False,
+            key="bold_labels",
+            stateful=stateful,
+        )
+
 
     # Neutral losses
     with loss_tab:
@@ -646,5 +728,12 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
         text_size=text_size,
         line_width=line_width,
         marker_size=marker_size,
+        axis_text_size=axis_text_size,
+        title_text_size=title_text_size,
+        tick_text_size=tick_text_size,
+        fig_width=fig_width,
+        fig_height=fig_height,
+        hide_error_percentile_labels=hide_error_percentile_labels,
+        bold_labels=bold_labels,
     )
 

@@ -13,9 +13,11 @@ from color_util import get_color_dict
 from plot_util import (
     generate_annonated_spectra_plotly,
     generate_fragment_plot_ion_type,
+    get_fragment_match_table_plotly,
 )
 from util import get_fragment_matches, get_match_cov, get_spectra_df, display_coverage_markdown, \
     get_fragment_match_table, get_query_params_url, shorten_url
+from IPython.display import display, HTML
 
 
 @st.cache_data
@@ -50,6 +52,10 @@ def get_cached_fragments(annotation:pt.ProFormaAnnotation,
     return fragments
 
 st.set_page_config(page_title="Spectra Viewer", page_icon=":eyeglasses:", layout="wide")
+## Tomas Mazak's workaround
+with open("load_mathjax.js", "r") as f:
+    js = f.read()
+    st.components.v1.html(f"<script>{js}</script>", height=0)
 
 with st.sidebar:
 
@@ -151,7 +157,33 @@ if not fragment_matches:
 
 color_dict = get_color_dict(params.min_charge, params.max_charge)
 match_cov = get_match_cov(fragment_matches)
+
+
+with st.sidebar:
+    with st.expander("Color Settings", expanded=False):
+        with st.form("color_params"):
+
+            unqiue_fargments = set()
+            for fragment in fragments:
+                unqiue_fargments.add((fragment.ion_type, fragment.charge,))
+
+            # sort and make list
+            unqiue_fargments = sorted(list(unqiue_fargments), key=lambda x: (x[0], x[1]))
+
+            cols = st.columns([1, 1, 1])
+            for i, (ion_type, charge) in enumerate(unqiue_fargments):
+                key = f"{'+'*charge}{ion_type}"
+
+                with cols[i % len(cols)]:
+                    params.color_dict[key] = st.color_picker(f"Color for {key}", value=color_dict[key])
+
+            # submit button
+            st.form_submit_button("Apply", use_container_width=True, type='primary')
+            # update color_dict
+
+
 spectra_df = get_spectra_df(params, fragment_matches)
+
 match_df = spectra_df[spectra_df["matched"]]
 
 cmap = mpl.colormaps.get_cmap("Blues")
@@ -159,8 +191,15 @@ spectra_fig = generate_annonated_spectra_plotly(spectra_df, scale=params.y_axis_
                                                 error_scale=params.mass_tolerance_type,
                                                 line_width=params.line_width, 
                                                 text_size=params.text_size,
-                                                marker_size=params.marker_size)
-combined_df = get_fragment_match_table(params, spectra_df, frag_df)
+                                                marker_size=params.marker_size,
+                                                axis_text_size=params.axis_text_size,
+                                                title_text_size=params.title_text_size,
+                                                tick_text_size=params.tick_text_size,
+                                                fig_width=params.fig_width,
+                                                fig_height=params.fig_height,
+                                                hide_error_precentile_labels=params.hide_error_percentile_labels,
+                                                bold_labels=params.bold_labels,
+)
 
 top_window, bottom_window = st.container(), st.container()
 
@@ -232,44 +271,28 @@ with top_window:
                 xaxis2=dict(range=[mz_range[0], mz_range[1]])  # If you have multiple x-axes
             )
 
-            st.plotly_chart(spectra_fig, use_container_width=True)
+            #import plotly.io as pio
+            #writable_io = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+            # Save the figure to a temporary file
+            #pio.write_html(spectra_fig, config={'toImageButtonOptions': {'width':None, 'height':None}}, file=writable_io.name)
+
+            # load and display the figure
+            #with open(writable_io.name, 'r') as f:
+            #    html_content = f.read()
+            #    st.html(html_content)
+
+            scale_to_frame = st.toggle("Scale to Frame", value=True, key="scale_to_frame")
+            st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
 
         run_spectra(spectra_fig, params)
 
-        with st.expander("Download Chart Options", expanded=False):
-
-            with st.form("download_options_form"):
-                download_width = st.number_input(
-                    "Download Chart Width (px)",
-                    min_value=100,
-                    max_value=5000,
-                    value=1920,
-                    step=100,
-                    key="download_width",
-                )
-                download_height = st.number_input(
-                    "Download Chart Height (px)",
-                    min_value=100,
-                    max_value=5000,
-                    value=1080,
-                    step=100,
-                    key="download_height",
-                )
-                download_scale = st.number_input(
-                    "Download Chart Scale",
-                    min_value=1.0,
-                    max_value=5.0,
-                    value=3.0,
-                    step=0.1,
-                    key="download_scale",
-                )
-
-                submitted = st.form_submit_button("Apply Options")
+        #frag_table_plotly = get_fragment_match_table_plotly(params, spectra_df, frag_df)
+        st.divider()
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmpfile:
             # Save the figure to the temporary file
             spectra_fig.write_image(
-                file=tmpfile.name, format="svg", width=download_width, height=download_height, scale=download_scale
+                file=tmpfile.name, format="svg", width=params.fig_width, height=params.fig_height, scale=1
             )
 
             # Read the content of the temporary file
@@ -286,20 +309,23 @@ with top_window:
             on_click="ignore",
         )
 
-
     with coverage_tab:
 
         st.subheader("Sequence Coverage", divider=True)
         display_coverage_markdown(params, spectra_df)
 
         st.subheader("Fragment Matches", divider=True)
+        combined_df = get_fragment_match_table(params, spectra_df, frag_df)
 
         df_html = combined_df.to_html()
 
         for col in combined_df.columns:
-            if col.startswith("+"):
-                df_html = df_html.replace(f'{col}</th>', f'{col.replace("+", "")}<sup>{col.count("+")}+</sup></th>')
-
+            # if col starts witha number 
+            if col[0].isdigit():
+                ion_type = col[-1]
+                charge = int(col[:-1])
+                df_html = df_html.replace(f"{col}", f"<sup>+{charge}</sup>{ion_type}")
+                
         st.html(df_html)
 
         st.subheader("Fragment Locations", divider=True)

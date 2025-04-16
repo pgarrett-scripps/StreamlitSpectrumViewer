@@ -98,11 +98,11 @@ def get_color_dict(min_charge, max_charge):
     :param min_charge: Minimum state in the dataset
     :return: Dictionary of colors for each state
     """
-    ion_to_color = {'unassigned': 'grey'}
+    ion_to_color = {'unassigned': '#808080'}
     for ion in pt.VALID_ION_TYPES:
         for charge in range(min_charge, max_charge + 1):
             if ion == 'i':
-                ion_to_color[f'{"+" * charge}{ion}'] = 'pink'
+                ion_to_color[f'{"+" * charge}{ion}'] = '#FFC0CB'
             else:
                 ion_to_color[f'{"+" * charge}{ion}'] = get_color_for_state(ion, charge, min_charge, max_charge)
 

@@ -25,6 +25,7 @@ def to_superscript(s):
         "9": "⁹",
         "0": "⁰",
         "+": "⁺",
+        ".": "‧",
     }
     return "".join(superscript_map.get(c, "") for c in str(s))
 
@@ -79,6 +80,8 @@ def generate_fragmentation_latex(peptide, forward_indices, reverse_indices):
 def get_ion_label(i: str, c: int) -> str:
     return "+" * c + i
 
+def get_ion_label_super(i: str, c: int) -> str:
+    return f"<sup>+{c}</sup>{i}"
 
 def get_fragment_matches(params: SpectraInputs, fragments: list[pt.Fragment]) -> list[pt.FragmentMatch]:
     mzs, ints = params.mz_int_values
@@ -129,6 +132,69 @@ def get_spectra_df(params: SpectraInputs, fragment_matches: list[pt.FragmentMatc
             match_data.append(fm.to_dict())
         else:
             fm = pt.FragmentMatch(fragment=None, mz=mz, intensity=i)
+            d = fm.to_dict()
+            
+            # update any vlaues that are 0 to be None
+            for key in d:
+                if key not in ["mz", "intensity"]:
+                    d[key] = None
+
+            data.append(d)
+
+    spectra_df = pd.DataFrame(data)
+    spectra_df["matched"] = False
+    spectra_df["abs_error"] = None
+    spectra_df["abs_error_ppm"] = None
+
+    if len(match_data) > 0:
+        match_df = pd.DataFrame(match_data)
+        match_df["matched"] = True
+        match_df["abs_error"] = match_df["error"].abs()
+        match_df["abs_error_ppm"] = match_df["error_ppm"].abs()
+    else:
+        match_df = pd.DataFrame()
+
+    if params.hide_unassigned_peaks:
+        spectra_df = spectra_df[spectra_df["matched"]]
+
+    def create_label(row):
+        # {charge}{ion_type}{number}{[isotope]}{(loss)}
+        return f"{row['charge']}{row['ion_type']}{row['number']}" + (
+            f"[{row['isotope']}]" if row["isotope"] != 0 else ""
+        ) + (f"({row['loss']})" if row["loss"] != 0 else "")
+
+
+    match_df['ion_label'] = match_df.apply(create_label, axis=1)
+    spectra_df['ion_label'] = ''
+
+    def create_ion_group_label(row):
+        # {charge}{ion_type}
+        return f"{row['charge']}{row['ion_type']}"
+    
+    match_df['ion_group_label'] = match_df.apply(create_ion_group_label, axis=1)
+    spectra_df['ion_group_label'] = 'unassigned'
+
+    grouped_df = pd.concat([spectra_df, match_df])
+
+    # Assigning colors based on color labels
+    grouped_df["color"] = [params.get_color(i, c) for i, c in zip(grouped_df["ion_type"], grouped_df["charge"])]
+
+    return grouped_df
+
+
+def get_spectra_dfold(params: SpectraInputs, fragment_matches: list[pt.FragmentMatch]) -> pd.DataFrame:
+
+    fragment_matches = {
+        fm.mz: fm for fm in fragment_matches
+    }  # keep the best fragment match for each mz
+
+    match_data, data = [], []
+    for mz, i in params.spectra:
+        fm = fragment_matches.get(mz, None)
+        if fm:
+            match_data.append(fm.to_dict())
+        else:
+            fm = pt.FragmentMatch(fragment=None, mz=mz, intensity=i)
             data.append(fm.to_dict())
 
     spectra_df = pd.DataFrame(data)
@@ -144,30 +210,79 @@ def get_spectra_df(params: SpectraInputs, fragment_matches: list[pt.FragmentMatc
     else:
         match_df = pd.DataFrame()
 
-    # spectra_df = spectra_df[~spectra_df['mz'].isin(match_df['mz'])]
     spectra_df = pd.concat([spectra_df, match_df])
 
     if params.hide_unassigned_peaks:
         spectra_df = spectra_df[spectra_df["matched"]]
 
+
     spectra_df["ion_color_type"] = spectra_df["ion_type"]
     spectra_df.loc[spectra_df["internal"], "ion_color_type"] = "i"
+    
 
     def create_labels(row):
         if row["ion_type"] != "":
-            charge_str = "+" * int(row["charge"])
+            color_label = get_ion_label(row["ion_type"], int(row["charge"]))
+            ion_label = get_ion_label(row["ion_type"], int(row["charge"]))
+        else:
+            color_label = "unassigned"
+            ion_label = "unassigned"
+
+        return ion_label, color_label
+
+    def create_labels_super(row):
+        if row["ion_type"] != "":
+            charge_str = "+" + str(row["charge"])
             charge = int(row["charge"])
             ion_type_str = row["ion_type"]
+            ion_number = row["number"]
+            isotope_number = row["isotope"]
+            loss = row["loss"]
 
-            if row["internal"]:
-                color_label = get_ion_label(row["ion_type"], int(row["charge"]))
-                # ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}i"
-                ion_label = row["label"]
-            else:
-                color_label = get_ion_label(row["ion_type"], int(row["charge"]))
-                # ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}"
-                ion_label = row["label"]
+            # color_label = get_ion_label(row["ion_type"], int(row["charge"]))
+            # ion_label = f"{get_ion_label(row['ion_type'], int(row['charge']))}{int(row['parent_number'])}"
+            color_label = f"<sup>{charge_str}</sup>{ion_type_str}"
+            ion_label = f"<sup>{charge_str}</sup>{ion_type_str}<sub>{ion_number}</sub>"
 
+            if isotope_number != 0:
+                ion_label += f"<sub>[{isotope_number}]</sub>"
+
+            if loss != 0:
+                ion_label += f"<sub>({str(round(row['loss'], 2))})</sub>"
+
+            
+        else:
+            color_label = "unassigned"
+            ion_label = "unassigned"
+
+        return ion_label, color_label
+
+
+    def create_labels_formated(row):
+        # load pip install mathjax
+        
+        if row["ion_type"] != "":
+            charge = int(row["charge"])
+            ion_type = row["ion_type"]
+            
+            # Build LaTeX string components
+            charge_latex = f"^{{{'+' + str(charge)}}}" if charge > 0 else ""
+            
+            # Check if isotope exists and has a valid value
+            isotope_latex = ""
+            if "isotope" in row and pd.notna(row["isotope"]) and row["isotope"] > 0:
+                isotope_latex = f"^{{{'*'+str(row['isotope'])}}}"
+            
+            # Check if loss exists and has a valid value
+            loss_latex = ""
+            if "loss" in row and pd.notna(row["loss"]) and row["loss"] != 0:
+                loss_latex = f"_{{({str(round(row['loss'],2))})}}"
+                
+            ion_number_latex = f"_{{{'i' if row['internal'] else ''}{row['number']}}}"
+            
+            # Create formatted ion label in LaTeX
+            ion_label = f"${isotope_latex}{loss_latex}{ion_type}{charge_latex}{ion_number_latex}$"
+            color_label = f"${ion_type}{charge_latex}$"
         else:
             color_label = "unassigned"
             ion_label = "unassigned"
@@ -178,12 +293,29 @@ def get_spectra_df(params: SpectraInputs, fragment_matches: list[pt.FragmentMatc
     labels = [create_labels(row) for _, row in spectra_df.iterrows()]
     spectra_df["ion_label"], spectra_df["color_label"] = zip(*labels)
 
+    formatted_labels = [
+        create_labels_formated(row) for _, row in spectra_df.iterrows()
+    ]
+    spectra_df["ion_label_formated"], spectra_df["color_label_formated"] = zip(
+        *formatted_labels
+    )
+
+    super_labels = [
+        create_labels_super(row) for _, row in spectra_df.iterrows()
+    ]
+    spectra_df["ion_label_super"], spectra_df["color_label_super"] = zip(
+        *super_labels
+    )
+    spectra_df["label"] = spectra_df["ion_label_super"]
+
+
     spectra_df.loc[spectra_df["ion_type"] == "I", "label"] = spectra_df.loc[
         spectra_df["ion_type"] == "I", "sequence"
     ].values
 
     # Assigning colors based on color labels
     spectra_df["color"] = [params.color_dict[label] for label in spectra_df["color_label"]]
+    spectra_df["color_label"] = spectra_df["color_label_super"]
 
     return spectra_df
 
@@ -247,7 +379,7 @@ def get_fragment_match_table(params: SpectraInputs, spectra_df: pd.DataFrame, fr
 
             data[ion] = frags
 
-            combined_data[get_ion_label(ion, charge)] = frags
+            combined_data[f"{charge}{ion}"] = frags
 
             # Displaying the table
             df = pd.DataFrame(data)
@@ -268,41 +400,6 @@ def get_fragment_match_table(params: SpectraInputs, spectra_df: pd.DataFrame, fr
     # sort columns based on alphabetical order
     combined_df = combined_df.reindex(sorted(combined_df.columns), axis=1)
 
-    styled_dfs = []
-
-    def color_by_ion_type(col):
-        ion_type = col.name[-1]
-        color = params.color_dict.get(
-            ion_type, "grey"
-        )  # get color or default to grey if not found
-        return ["color: %s" % color] * len(col)
-
-    for df in dfs:
-        styled_df = df.style.apply(color_by_ion_type)
-
-        # Set table styles with increased horizontal padding for more space between columns,
-        # centered text, and no borders
-        styles = [
-            dict(
-                selector="td",
-                props=[
-                    ("padding", "2px 2px"),
-                    ("text-align", "center"),
-                    ("border", "none"),
-                ],
-            ),
-            dict(
-                selector="th",
-                props=[
-                    ("padding", "2px 2px"),
-                    ("text-align", "center"),
-                    ("border", "none"),
-                ],
-            ),
-        ]
-        styled_df = styled_df.set_table_styles(styles)
-        styled_dfs.append(styled_df)
-
     def highlight_cells(data):
         # Initialize empty DataFrame with same index and columns as original
         styled = pd.DataFrame("", index=data.index, columns=data.columns)
@@ -317,11 +414,12 @@ def get_fragment_match_table(params: SpectraInputs, spectra_df: pd.DataFrame, fr
                     continue
 
                 ion = col[-1]
+                charge = int(col[:-1])
                 if ion in "abc":
                     ion_number = row + 1
                 else:
                     ion_number = len(params.unmodified_sequence) - row
-                label = col + str(ion_number)
+                ion_key = col + str(ion_number)
                 mz = data.loc[row, col]
 
                 if mz <= params.min_mz or mz >= params.max_mz:
@@ -329,19 +427,18 @@ def get_fragment_match_table(params: SpectraInputs, spectra_df: pd.DataFrame, fr
                         f"background-color: #BEBEBE; color: black; text-align: center; font-weight: bold;"
                     )
                 else:
-                    if label in accepted_normal_ions:
+                    if ion_key in accepted_normal_ions:
                         styled.loc[row, col] = (
-                            f"background-color: {params.color_dict[col]}; color: white; text-align: center; font-weight: bold;"
+                            f"background-color: {params.get_color(ion, charge)}; color: white; text-align: center; font-weight: bold;"
                         )
-                    elif label in accepted_internal_ions:
+                    elif ion_key in accepted_internal_ions:
                         styled.loc[row, col] = (
-                            f"background-color: {params.color_dict[col]}; color: magenta; text-align: center; font-style: italic; font-weight: bold;"
+                            f"background-color: {params.get_color(ion, charge)}; color: magenta; text-align: center; font-style: italic; font-weight: bold;"
                         )
                     else:
                         styled.loc[row, col] = (
                             f"background-color: white; color: black; text-align: center;"
                         )
-
         return styled
 
     matched_ions = spectra_df[spectra_df["ion_type"] != ""]
