@@ -46,6 +46,8 @@ class SpectraInputs:
     max_mz: float
     min_intensity_type: str
     min_intensity: float
+    max_intensity_type: str
+    max_intensity: float
     line_width: float
     text_size: float
     marker_size: float
@@ -128,6 +130,21 @@ class SpectraInputs:
                 if intensity >= self.min_intensity
             ]
 
+        if self.max_intensity_type == "relative":
+            max_intensity = max([intensity for _, intensity in spectra])
+            spectra = [
+                (mz, intensity)
+                for mz, intensity in spectra
+                if intensity <= self.max_intensity / 100 * max_intensity
+            ]
+
+        if self.max_intensity_type == "absolute":
+            spectra = [
+                (mz, intensity)
+                for mz, intensity in spectra
+                if intensity <= self.max_intensity
+            ]
+
         if self.min_mz:
             spectra = [
                 (mz, intensity)
@@ -171,15 +188,6 @@ class SpectraInputs:
     @cached_property
     def mz_int_values(self) -> (list[float], list[float]):
         return self.mz_values, self.intensity_values
-    
-    @property
-    def filtered_spectra(self) -> list[tuple[float, float]]:
-        return filter_spectra(
-            self.spectra_text, 
-            self.min_intensity, 
-            self.min_intensity_type, 
-            self.min_mz, 
-            self.max_mz)
     
     @property
     def filtered_mz_values(self) -> list[float]:
@@ -292,33 +300,6 @@ def decompress_spectra(input_str: str) -> str:
     except ValueError as e:
         st.error(f"Error decompressing spectra: {e}")
         raise ValueError(f"Error decompressing spectra: {e}") from e
-
-
-def filter_spectra(spectra, min_intensity, min_intensity_type, min_mz, max_mz):
-    """Filter spectra based on intensity and m/z thresholds."""
-    if not spectra:
-        return []
-    
-    mzs, ints = [], []
-    for line in spectra.split("\n"):
-        mz, intensity = line.split(" ")
-        mzs.append(float(mz))
-        ints.append(float(intensity))
-
-    int_threshold = min_intensity
-    if min_intensity_type == "relative":
-        int_threshold = max(ints) * (min_intensity / 100)
-
-    filtered_mzs, filtered_ints = [], []
-    for mz, intensity in zip(mzs, ints):
-        if intensity <= int_threshold:
-            continue
-        if mz < min_mz or mz > max_mz:
-            continue
-        filtered_mzs.append(mz)
-        filtered_ints.append(intensity)
-
-    return list(zip(filtered_mzs, filtered_ints))
 
 
 def get_all_inputs(stateful: bool) -> SpectraInputs:
@@ -523,6 +504,16 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
                 stateful=stateful,
             )
 
+            max_intensity_type = stp.selectbox(
+                label="Max Intensity Type",
+                options=constants.VALID_MIN_INTENSITY_TYPES,
+                index=constants.VALID_MIN_INTENSITY_TYPES.index(
+                    constants.DEFAULT_MIN_INTENSITY_TYPE
+                ),
+                key="max_intensity_type",
+                stateful=stateful,
+            )
+
         with c2:
             max_mz = stp.number_input(
                 label="Max m/z",
@@ -541,6 +532,15 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
                 max_value=1e9,
                 help=constants.MIN_INTENSITY_HELP,
                 key="min_intensity",
+                stateful=stateful,
+            )
+            max_intensity = stp.number_input(
+                label="Max Intensity",
+                value=1e9,
+                min_value=0.0,
+                max_value=1e9,
+                help=constants.MIN_INTENSITY_HELP,
+                key="max_intensity",
                 stateful=stateful,
             )
 
@@ -735,6 +735,8 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
         max_mz=max_mz,
         min_intensity_type=min_intensity_type,
         min_intensity=min_intensity,
+        max_intensity_type=max_intensity_type,
+        max_intensity=max_intensity,
         h2o_loss=h2o_loss,
         nh3_loss=nh3_loss,
         h3po4_loss=h3po4_loss,
