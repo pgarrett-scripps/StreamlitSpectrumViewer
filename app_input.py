@@ -660,7 +660,7 @@ def get_all_inputs(stateful: bool) -> SpectraInputs:
             cols = st.columns([1, 1, 1])
             for i, key in enumerate(color_dict.keys()):
                 with cols[i % len(cols)]:
-                    color_dict[key] = stp.color_picker(f"{key}", value=color_dict[key])
+                    color_dict[key] = stp.color_picker(f"{key}", value=color_dict[key], stateful=stateful)
 
 
     # Neutral losses

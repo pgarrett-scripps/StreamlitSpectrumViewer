@@ -314,7 +314,6 @@ with spectra_tab:
             min_mz, max_mz = params.min_spectra_mz, params.max_spectra_mz
             min_intensity, max_intensity = params.min_spectra_intensity, params.max_spectra_intensity
 
-
             c1, c2 = st.columns(2)
             min_mz_zoom = c1.number_input(
                 "Min M/Z (Zoom)",
