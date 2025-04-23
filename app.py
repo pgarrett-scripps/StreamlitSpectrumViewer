@@ -307,13 +307,43 @@ with spectra_tab:
                                                     bold_labels=params.bold_labels,
     )
 
-    spectra_fig = spectra_fig.update_layout(
-            xaxis=dict(range=[mz_range[0], mz_range[1]]),
-            xaxis2=dict(range=[mz_range[0], mz_range[1]])  # If you have multiple x-axes
-        )
+    @st.fragment
+    def display_plot(spectra_fig):
+        with st.expander("Zoom Options", expanded=False):
 
-    scale_to_frame = st.toggle("Scale to Frame", value=True, key="scale_to_frame")
-    st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
+            min_mz, max_mz = params.min_spectra_mz, params.max_spectra_mz
+            min_intensity, max_intensity = params.min_spectra_intensity, params.max_spectra_intensity
+
+
+            c1, c2 = st.columns(2)
+            min_mz_zoom = c1.number_input(
+                "Min M/Z (Zoom)",
+                value=min_mz - min_mz* 0.02,
+            )
+            max_mz_zoom = c2.number_input(
+                "Max M/Z (Zoom)",
+                value=max_mz + max_mz* 0.02,
+            )
+            min_intensity_zoom = c1.number_input(
+                "Min Intensity (Zoom)",
+                value=0.0,
+            )
+            max_intensity_zoom = c2.number_input(
+                "Max Intensity (Zoom)",
+                value=max_intensity + max_intensity*0.1,
+            )
+
+            spectra_fig = spectra_fig.update_layout(
+                    xaxis=dict(range=[min_mz_zoom, max_mz_zoom]),
+                    xaxis2=dict(range=[min_mz_zoom, max_mz_zoom]),  # If you have multiple x-axes
+                    yaxis2=dict(range=[min_intensity_zoom, max_intensity_zoom])  # If you have multiple y-axes
+                )
+
+        scale_to_frame = st.toggle("Scale to Frame", value=True, key="scale_to_frame")
+        st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
+
+    display_plot(spectra_fig)
+
     #frag_table_plotly = get_fragment_match_table_plotly(params, spectra_df, frag_df)
     st.divider()
 

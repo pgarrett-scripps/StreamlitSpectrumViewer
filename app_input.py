@@ -178,6 +178,14 @@ class SpectraInputs:
         return max([mz for mz, _ in self.spectra])
     
     @cached_property
+    def min_spectra_intensity(self):
+        return min([intensity for _, intensity in self.spectra])
+    
+    @cached_property
+    def max_spectra_intensity(self):
+        return max([intensity for _, intensity in self.spectra])
+    
+    @cached_property
     def mz_values(self) -> list[float]:
         return [mz for mz, _ in self.spectra]
     
@@ -188,14 +196,6 @@ class SpectraInputs:
     @cached_property
     def mz_int_values(self) -> (list[float], list[float]):
         return self.mz_values, self.intensity_values
-    
-    @property
-    def filtered_mz_values(self) -> list[float]:
-        return [mz for mz, _ in self.filtered_spectra]
-    
-    @property
-    def filtered_intensity_values(self) -> list[float]:
-        return [intensity for _, intensity in self.filtered_spectra]
     
     
     def get_color(self, ion: str, charge: int) -> str:
