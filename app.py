@@ -1,4 +1,5 @@
 import tempfile
+import uuid
 
 import pandas as pd
 import streamlit_permalink as stp
@@ -60,6 +61,34 @@ if 'page_loc' not in st.session_state or st.session_state.page_loc is None:
 if "first_run" not in st.session_state and st.session_state.page_loc is not None:
     st.session_state.first_run = True
 
+
+@st.fragment()
+def params_fragmenter():
+
+    warning_container = st.container()
+
+    stateful = stp.toggle("Stateful", True, key="stateful")
+
+    if not stateful:
+        st.query_params.clear()
+        st.query_params["stateful"] = "false"
+
+    _params = get_all_inputs(stateful)
+
+    if "params" in st.session_state and _params != st.session_state.params:
+        with warning_container:
+            st.warning("Parameters have changed, please click the update button to refresh the results.")
+
+    update_btn = st.button("Update", key="update_btn", type="primary", use_container_width=True)
+        
+    if 'params' not in st.session_state:
+        st.session_state.params = _params
+        st.rerun(scope='app')
+    
+    if update_btn:
+        st.session_state.params = _params
+        st.rerun(scope='app')
+
 with st.sidebar:
 
     st.markdown(f"""
@@ -83,34 +112,10 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
 
-    @st.fragment
-    def params_fragmenter():
 
-        warning_container = st.container()
-
-        stateful = stp.toggle("Stateful", True, key="stateful")
-
-        if not stateful:
-            st.query_params.clear()
-            st.query_params["stateful"] = "false"
-
-        _params = get_all_inputs(stateful)
-
-        if "params" in st.session_state and _params != st.session_state.params:
-            with warning_container:
-                st.warning("Parameters have changed, please click the update button to refresh the results.")
-
-        return _params
     
-    _params = params_fragmenter()
-    update_btn = st.button("Update", key="update_btn", type="primary", use_container_width=True)
-    
-    if 'params' not in st.session_state:
-        st.session_state.params = _params
-    
-    if update_btn:
-        st.session_state.params = _params
-        st.rerun()
+    params_fragmenter()
+ 
 
 params = st.session_state.params
 
@@ -291,7 +296,39 @@ with spectra_tab:
     # Update the color column only for rows with non-null and non-empty custom_color values
     mask = (spectra_df['custom_color'].notna()) & (spectra_df['custom_color'] != "")
     spectra_df.loc[mask, 'color'] = spectra_df.loc[mask, 'custom_color']
-    
+
+    with st.expander("Zoom Options"):
+        with st.form('Zoom Options'):
+            min_mz, max_mz = params.min_spectra_mz, params.max_spectra_mz
+            min_intensity, max_intensity = params.min_spectra_intensity, params.max_spectra_intensity
+
+            c1, c2 = st.columns(2)
+            min_mz_zoom = c1.number_input(
+                "Min M/Z (Zoom)",
+                value=0,
+            )
+            max_mz_zoom = c2.number_input(
+                "Max M/Z (Zoom)",
+                value=1e9,
+            )
+            min_intensity_zoom = c1.number_input(
+                "Min Intensity (Zoom)",
+                value=0.0,
+            )
+            max_intensity_zoom = c2.number_input(
+                "Max Intensity (Zoom)",
+                value=1e9,
+            )
+
+            max_intensity_zoom = min(max_intensity_zoom, max_intensity + max_intensity*0.1)
+
+            min_mz_zoom = max(min_mz_zoom, min_mz - min_mz*0.02)
+            max_mz_zoom = min(max_mz_zoom, max_mz + max_mz*0.02)
+
+
+            scale_to_frame = st.toggle("Scale to Frame", value=True)
+
+            st.form_submit_button("Update", type="primary", use_container_width=True)
 
     spectra_fig = generate_annonated_spectra_plotly(spectra_df, scale=params.y_axis_scale,
                                                     error_scale=params.mass_tolerance_type,
@@ -307,41 +344,13 @@ with spectra_tab:
                                                     bold_labels=params.bold_labels,
     )
 
-    @st.fragment
-    def display_plot(spectra_fig):
-        with st.expander("Zoom Options", expanded=False):
+    spectra_fig = spectra_fig.update_layout(
+            xaxis=dict(range=[min_mz_zoom, max_mz_zoom]),
+            xaxis2=dict(range=[min_mz_zoom, max_mz_zoom]),  # If you have multiple x-axes
+            yaxis2=dict(range=[min_intensity_zoom, max_intensity_zoom])  # If you have multiple y-axes
+        )
 
-            min_mz, max_mz = params.min_spectra_mz, params.max_spectra_mz
-            min_intensity, max_intensity = params.min_spectra_intensity, params.max_spectra_intensity
-
-            c1, c2 = st.columns(2)
-            min_mz_zoom = c1.number_input(
-                "Min M/Z (Zoom)",
-                value=min_mz - min_mz* 0.02,
-            )
-            max_mz_zoom = c2.number_input(
-                "Max M/Z (Zoom)",
-                value=max_mz + max_mz* 0.02,
-            )
-            min_intensity_zoom = c1.number_input(
-                "Min Intensity (Zoom)",
-                value=0.0,
-            )
-            max_intensity_zoom = c2.number_input(
-                "Max Intensity (Zoom)",
-                value=max_intensity + max_intensity*0.1,
-            )
-
-            spectra_fig = spectra_fig.update_layout(
-                    xaxis=dict(range=[min_mz_zoom, max_mz_zoom]),
-                    xaxis2=dict(range=[min_mz_zoom, max_mz_zoom]),  # If you have multiple x-axes
-                    yaxis2=dict(range=[min_intensity_zoom, max_intensity_zoom])  # If you have multiple y-axes
-                )
-
-        scale_to_frame = st.toggle("Scale to Frame", value=True, key="scale_to_frame")
-        st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
-
-    display_plot(spectra_fig)
+    st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
 
     #frag_table_plotly = get_fragment_match_table_plotly(params, spectra_df, frag_df)
     st.divider()
