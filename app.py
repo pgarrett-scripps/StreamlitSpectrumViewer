@@ -307,37 +307,13 @@ with spectra_tab:
                                                     bold_labels=params.bold_labels,
     )
 
-    @st.fragment
-    def run_spectra(spectra_fig, params):
-        # slider to zoom from min to max mz
-        min_mz, max_mz = params.min_spectra_mz, params.max_spectra_mz
-        mz_range = st.slider("Zoom M/Z Range", min_value=min_mz, max_value=max_mz, value=(min_mz, max_mz),
-                            key="plot_mz_range")
-
-
-
-        # update the spectra_df with the new mz range
-        # update fid to be from 100-200 mz
-        spectra_fig = spectra_fig.update_layout(
+    spectra_fig = spectra_fig.update_layout(
             xaxis=dict(range=[mz_range[0], mz_range[1]]),
             xaxis2=dict(range=[mz_range[0], mz_range[1]])  # If you have multiple x-axes
         )
 
-        #import plotly.io as pio
-        #writable_io = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
-        # Save the figure to a temporary file
-        #pio.write_html(spectra_fig, config={'toImageButtonOptions': {'width':None, 'height':None}}, file=writable_io.name)
-
-        # load and display the figure
-        #with open(writable_io.name, 'r') as f:
-        #    html_content = f.read()
-        #    st.html(html_content)
-
-        scale_to_frame = st.toggle("Scale to Frame", value=True, key="scale_to_frame")
-        st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
-
-    run_spectra(spectra_fig, params)
-
+    scale_to_frame = st.toggle("Scale to Frame", value=True, key="scale_to_frame")
+    st.plotly_chart(spectra_fig, use_container_width=scale_to_frame)
     #frag_table_plotly = get_fragment_match_table_plotly(params, spectra_df, frag_df)
     st.divider()
 
